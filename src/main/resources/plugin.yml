@@ -1,0 +1,4 @@
+name: AI_NPC_Plugin
+version: '1.0-SNAPSHOT'
+main: org.myplugin.aI_NPC_Plugin.AI_NPC_Plugin
+api-version: '1.20'
