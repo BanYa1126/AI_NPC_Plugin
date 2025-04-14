@@ -1,60 +1,51 @@
 package org.myplugin.aI_NPC_Plugin.listener;
 
-import org.myplugin.aI_NPC_Plugin.gui.NPCSettingsGUI;
-import org.myplugin.aI_NPC_Plugin.npc.AINPC;
-import org.myplugin.aI_NPC_Plugin.registry.AINPCRegistry;
-import net.wesjd.anvilgui.AnvilGUI; // Anvil GUI 라이브러리 필요
-import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.inventory.InventoryClickEvent;
-import org.bukkit.inventory.ItemStack;
+import org.bukkit.event.player.AsyncPlayerChatEvent;
+import org.bukkit.inventory.Inventory;
+import org.myplugin.aI_NPC_Plugin.gui.NPCSettingsGUI;
+import org.myplugin.aI_NPC_Plugin.npc.AINPC;
 
+import java.util.HashMap;
 import java.util.UUID;
 
 public class GUIListener implements Listener {
 
+    public static final HashMap<UUID, AINPC> openedNPCMap = new HashMap<>();
+    public static final HashMap<UUID, AINPC> waitingNameInput = new HashMap<>();
+    public static final HashMap<UUID, AINPC> waitingPromptInput = new HashMap<>();
+
     @EventHandler
     public void onInventoryClick(InventoryClickEvent event) {
-        if (!(event.getWhoClicked() instanceof Player player)) return;
-        if (!event.getView().getTitle().equals("§9NPC 설정")) return;
+        if (!event.getView().getTitle().equals("NPC 설정")) return;
 
         event.setCancelled(true);
 
-        ItemStack clicked = event.getCurrentItem();
-        if (clicked == null || !clicked.hasItemMeta()) return;
+        UUID uuid = event.getWhoClicked().getUniqueId();
+        if (openedNPCMap.containsKey(uuid)) {
+            NPCSettingsGUI.handleClick(event, openedNPCMap.get(uuid));
+        }
+    }
 
-        String title = clicked.getItemMeta().getDisplayName();
-        UUID uuid = player.getUniqueId();
-        AINPC npc = AINPCRegistry.getSelectedNPC(uuid);
-        if (npc == null) return;
+    @EventHandler
+    public void onChatInput(AsyncPlayerChatEvent event) {
+        UUID uuid = event.getPlayer().getUniqueId();
+        String msg = event.getMessage();
 
-        switch (title) {
-            case "§a이름 설정" -> {
-                new AnvilGUI.Builder()
-                        .onComplete((p, text) -> {
-                            npc.setName(text);
-                            player.sendMessage("§aNPC 이름이 '" + text + "' 으로 변경되었습니다.");
-                            return AnvilGUI.Response.close();
-                        })
-                        .title("NPC 이름 입력")
-                        .text(npc.getName())
-                        .plugin(/* your plugin instance */)
-                        .open(player);
-            }
+        if (waitingNameInput.containsKey(uuid)) {
+            AINPC npc = waitingNameInput.remove(uuid);
+            npc.setName(msg);
+            event.getPlayer().sendMessage("✅ 이름이 설정되었습니다: " + msg);
+            event.setCancelled(true);
+        }
 
-            case "§e프롬프트 설정" -> {
-                new AnvilGUI.Builder()
-                        .onComplete((p, text) -> {
-                            npc.setPrompt(text);
-                            player.sendMessage("§e프롬프트가 수정되었습니다.");
-                            return AnvilGUI.Response.close();
-                        })
-                        .title("AI 프롬프트 입력")
-                        .text(npc.getPrompt())
-                        .plugin(/* your plugin instance */)
-                        .open(player);
-            }
+        if (waitingPromptInput.containsKey(uuid)) {
+            AINPC npc = waitingPromptInput.remove(uuid);
+            npc.setPrompt(msg);
+            event.getPlayer().sendMessage("✅ 프롬프트가 설정되었습니다.");
+            event.setCancelled(true);
         }
     }
 }
