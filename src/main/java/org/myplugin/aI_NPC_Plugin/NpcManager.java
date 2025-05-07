@@ -13,15 +13,20 @@ public class NpcManager {
     private final Gson gson = new Gson();
     private final AI_NPC_Plugin plugin;
     private NpcPromptData currentData;
+    private String currentPromptId = "npc";
 
     public NpcManager(AI_NPC_Plugin plugin) {
         this.plugin = plugin;
-        loadNpcData();
+        loadNpcData(this.currentPromptId);
     }
 
     public void openNpcEditGUI(Player player) {
-        Inventory gui = Bukkit.createInventory(null, 27, "\uD83D\uDEE0 NPC 편집 - " + currentData.name);
+        if (currentData == null) {
+            player.sendMessage(ChatColor.RED + "해당 프롬프트 데이터를 불러올 수 없습니다.");
+            return;
+        }
 
+        Inventory gui = Bukkit.createInventory(null, 27, "🛠 NPC 편집 - " + currentData.name);
         gui.setItem(10, new ItemStack(Material.PLAYER_HEAD));
         gui.setItem(12, createEditableItem("이름", currentData.name));
         gui.setItem(13, createEditableItem("나이", currentData.age));
@@ -34,6 +39,7 @@ public class NpcManager {
 
         player.openInventory(gui);
     }
+
 
     private ItemStack createEditableItem(String title, String value) {
         ItemStack item = new ItemStack(Material.PAPER);
@@ -61,19 +67,36 @@ public class NpcManager {
     }
 
     public void saveNpcData() {
-        try (Writer writer = new FileWriter("plugins/NPCPlugin/NPCData/npc.json")) {
+        File dataFile = new File(plugin.getDataFolder(), "NPCData/" + currentPromptId + ".json");
+
+        // 디렉토리 없으면 생성
+        if (!dataFile.getParentFile().exists()) {
+            dataFile.getParentFile().mkdirs();
+        }
+
+        try (Writer writer = new FileWriter(dataFile)) {
             gson.toJson(currentData, writer);
         } catch (IOException e) {
             plugin.getLogger().warning("JSON 저장 실패: " + e.getMessage());
         }
     }
 
-    private void loadNpcData() {
-        try (Reader reader = new FileReader("plugins/NPCPlugin/NPCData/npc.json")) {
+    public void loadNpcData(String promptId) {
+        this.currentPromptId = promptId;
+        File dataFile = new File(plugin.getDataFolder(), "NPCData/" + promptId + ".json");
+
+        if (!dataFile.exists()) {
+            plugin.getLogger().warning("프롬프트 파일이 존재하지 않습니다: " + dataFile.getAbsolutePath());
+            currentData = null;
+            return;
+        }
+
+        try (Reader reader = new FileReader(dataFile)) {
             currentData = gson.fromJson(reader, NpcPromptData.class);
+            plugin.getLogger().info("프롬프트 로드됨: " + promptId);
         } catch (IOException e) {
-            plugin.getLogger().warning("JSON 파일 로드 실패. 기본값 사용.");
-            currentData = new NpcPromptData();
+            plugin.getLogger().warning("프롬프트 파일 읽기 실패: " + e.getMessage());
+            currentData = null;
         }
     }
 }
