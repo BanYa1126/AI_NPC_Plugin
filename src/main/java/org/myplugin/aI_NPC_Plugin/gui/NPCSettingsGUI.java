@@ -12,7 +12,7 @@ import org.myplugin.aI_NPC_Plugin.listener.GUIListener;
 import org.myplugin.aI_NPC_Plugin.npc.AINPC;
 
 public class NPCSettingsGUI {
-
+//test
     public static void open(Player player, AINPC npc) {
         Inventory gui = Bukkit.createInventory(null, 9, "NPC 설정");
 
