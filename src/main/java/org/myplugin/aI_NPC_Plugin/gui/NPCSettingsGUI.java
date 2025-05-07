@@ -17,7 +17,7 @@ public class NPCSettingsGUI {
         Inventory gui = Bukkit.createInventory(null, 9, "NPC 설정");
 
         gui.setItem(2, createItem(Material.NAME_TAG, "§a이름 설정"));
-        gui.setItem(4, createItem(Material.BOOK, "§b프롬프트 설정"));
+        gui.setItem(4, createItem(Material.BOOK, "§프롬프트 설정"));
         gui.setItem(8, createItem(Material.LIME_WOOL, "§a설정 완료"));
 
         player.openInventory(gui);
