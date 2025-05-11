@@ -28,12 +28,6 @@ public final class AI_NPC_Plugin extends JavaPlugin {
         // 명령어 등록
         getCommand("model").setExecutor(new ModelCommand(this));
         getCommand("ainpc").setExecutor(new AINPCCommand(this));
-        getCommand("npcgui").setExecutor((sender, command, label, args) -> {
-            if (sender instanceof Player player) {
-                promptEditorManager.openNpcEditGUI(player);
-            }
-            return true;
-        });
 
         // NPC 프롬프트 관리 GUI 초기화
         promptEditorManager = new PromptEditorManager(this);
