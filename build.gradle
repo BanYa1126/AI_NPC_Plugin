@@ -3,7 +3,7 @@ plugins {
     id("xyz.jpenilla.run-paper") version "2.3.1"
 }
 
-group = 'org.myplugin'
+group = 'org.capstone'
 version = '1.0-SNAPSHOT'
 
 repositories {
@@ -24,11 +24,14 @@ dependencies {
 
 tasks {
     runServer {
-        minecraftVersion("1.20.4")
+        // Configure the Minecraft version for our task.
+        // This is the only required configuration besides applying the plugin.
+        // Your plugin's jar (or shadowJar if present) will be used automatically.
+        minecraftVersion("1.20")
     }
 }
 
-def targetJavaVersion = 21
+def targetJavaVersion = 17
 java {
     def javaVersion = JavaVersion.toVersion(targetJavaVersion)
     sourceCompatibility = javaVersion
@@ -55,6 +58,11 @@ processResources {
     }
 }
 
-jar {
-    archiveFileName = 'AI_NPC_Plugin.jar'
+tasks.jar{
+    archiveFileName = 'PaperEduPlugin.jar'
+    destinationDirectory = file('D://PJ//Minecraft_Server//plugins')
+}
+
+dependencies {
+    implementation 'com.google.code.gson:gson:2.10.1'
 }

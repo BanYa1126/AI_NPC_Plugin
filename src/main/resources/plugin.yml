@@ -1,11 +1,11 @@
 name: AI_NPC_Plugin
-version: 1.0
-main: org.myplugin.aI_NPC_Plugin.AI_NPC_Plugin
-api-version: 1.20
-
+version: '1.0-SNAPSHOT'
+main: org.capstone.ai_npc_plugin.AI_NPC_Plugin
+api-version: '1.20'
 commands:
-  npcgui:
-    description: NPC 편집 GUI를 엽니다.
-    usage: /npcgui
-
-permissions: {}
+  model:
+    description: 모델 서버를 제어합니다.
+    usage: /model on | off
+  ainpc:
+    description: AI NPC를 생성 및 관리합니다.
+    usage: /ainpc create | prompt_fix | remove | reset | chatlog
