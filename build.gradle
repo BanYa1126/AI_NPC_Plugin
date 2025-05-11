@@ -54,3 +54,7 @@ processResources {
         expand props
     }
 }
+
+jar {
+    archiveFileName = 'AI_NPC_Plugin.jar'
+}

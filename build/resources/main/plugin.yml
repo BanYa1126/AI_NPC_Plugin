@@ -1,8 +1,11 @@
 name: AI_NPC_Plugin
-version: '1.0-SNAPSHOT'
+version: 1.0
 main: org.myplugin.aI_NPC_Plugin.AI_NPC_Plugin
-api-version: '1.20'
+api-version: 1.20
 
-commands: {}
+commands:
+  npcgui:
+    description: NPC 편집 GUI를 엽니다.
+    usage: /npcgui
 
 permissions: {}
