@@ -1,17 +1,18 @@
 package org.capstone.ai_npc_plugin.command;
 
 import org.bukkit.ChatColor;
-import org.bukkit.command.Command;
-import org.bukkit.command.CommandExecutor;
-import org.bukkit.command.CommandSender;
+import org.bukkit.Location;
+import org.bukkit.command.*;
 import org.bukkit.entity.Player;
+import org.bukkit.entity.Villager;
 import org.capstone.ai_npc_plugin.AI_NPC_Plugin;
 
-import java.util.Arrays;
+import java.util.*;
 
 public class AINPCCommand implements CommandExecutor {
 
     private final AI_NPC_Plugin plugin;
+    private final Set<UUID> nameInputWaiting = new HashSet<>();
 
     public AINPCCommand(AI_NPC_Plugin plugin) {
         this.plugin = plugin;
@@ -25,20 +26,43 @@ public class AINPCCommand implements CommandExecutor {
         }
 
         switch (args[0].toLowerCase()) {
-            case "prompt_fix":
-                if (args.length < 2) {
-                    if (sender instanceof Player player) {
-                        plugin.getNpcManager().openNpcEditGUI(player);
-                        sender.sendMessage(ChatColor.GREEN + "NPC 프롬프트 수정 GUI가 열렸습니다.");
-                    } else {
-                        sender.sendMessage(ChatColor.RED + "이 명령어는 플레이어만 사용할 수 있습니다.");
-                    }
+            case "create":
+                if (!(sender instanceof Player player)) {
+                    sender.sendMessage(ChatColor.RED + "이 명령어는 플레이어만 사용할 수 있습니다.");
                     return true;
                 }
-                String prompt = String.join(" ", Arrays.copyOfRange(args, 1, args.length));
-                AI_NPC_Plugin.globalNpc.setPrompt(prompt);
-                sender.sendMessage(ChatColor.YELLOW + "프롬프트가 수동으로 설정되었습니다.");
-                sender.sendMessage(ChatColor.GRAY + "※ JSON 기반 GUI 편집은 /ainpc prompt_fix 로 실행하세요.");
+
+                Location loc = player.getLocation().add(player.getLocation().getDirection().normalize().multiply(2));
+                Villager npc = player.getWorld().spawn(loc, Villager.class);
+                npc.setCustomName("AI 주민");
+                npc.setCustomNameVisible(true);
+                npc.setAI(false);
+                npc.setInvulnerable(true);
+                npc.setPersistent(true);
+                npc.setProfession(Villager.Profession.LIBRARIAN);
+
+                plugin.getNpcManager().openPromptSelectGUI(player, npc);
+                return true;
+
+            case "prompt_fix":
+                if (!(sender instanceof Player player)) {
+                    sender.sendMessage(ChatColor.RED + "이 명령어는 플레이어만 사용할 수 있습니다.");
+                    return true;
+                }
+
+                if (args.length < 2) {
+                    nameInputWaiting.add(player.getUniqueId());
+                    player.sendMessage(ChatColor.YELLOW + "수정할 NPC의 이름을 채팅으로 입력해주세요.");
+                    return true;
+                }
+
+                String targetName = String.join(" ", Arrays.copyOfRange(args, 1, args.length));
+                if (plugin.getNpcManager().loadPromptDataByName(targetName)) {
+                    plugin.getNpcManager().openNpcEditGUI(player);
+                    player.sendMessage(ChatColor.GREEN + "NPC 프롬프트 GUI가 열렸습니다.");
+                } else {
+                    player.sendMessage(ChatColor.RED + "해당 이름의 NPC를 찾을 수 없습니다.");
+                }
                 return true;
 
             case "remove":
@@ -59,5 +83,8 @@ public class AINPCCommand implements CommandExecutor {
                 sender.sendMessage("알 수 없는 명령어입니다.");
                 return true;
         }
+    }
+    public Set<UUID> getNameInputWaiting() {
+        return nameInputWaiting;
     }
 }
