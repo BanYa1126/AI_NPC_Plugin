@@ -21,7 +21,9 @@ public final class AI_NPC_Plugin extends JavaPlugin {
 
     @Override
     public void onEnable() {
-        promptEditorManager = new PromptEditorManager(this);
+        saveDefaultConfig();
+        String folderPath = getConfig().getString("promptDataFolder", "promptData");
+        promptEditorManager = new PromptEditorManager(this, folderPath);
 
         getCommand("model").setExecutor(new ModelCommand(this));
         getCommand("ainpc").setExecutor(new AINPCCommand(this));

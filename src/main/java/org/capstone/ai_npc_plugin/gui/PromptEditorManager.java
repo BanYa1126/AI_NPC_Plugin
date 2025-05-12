@@ -4,149 +4,131 @@ import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
+import org.bukkit.NamespacedKey;
 import org.bukkit.entity.Player;
 import org.bukkit.entity.Villager;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
-import org.capstone.ai_npc_plugin.AI_NPC_Plugin;
+import org.bukkit.plugin.Plugin;
 import org.capstone.ai_npc_plugin.npc.PromptData;
 
 import java.io.File;
 import java.io.FileReader;
 import java.io.FileWriter;
+import java.io.IOException;
 import java.io.Reader;
 import java.io.Writer;
-import java.io.IOException;
 
 public class PromptEditorManager {
 
-    private final AI_NPC_Plugin plugin;
-    private final NpcFileSelector promptSelector;
+    private final Plugin plugin;
     private final File promptDataFolder;
+    private final NpcFileSelector promptSelector;
 
     private PromptData currentData;
     private File currentDataFile;
 
-    public PromptEditorManager(AI_NPC_Plugin plugin) {
+    /**
+     * @param plugin     플러그인 인스턴스
+     * @param folderPath config.yml에서 읽어온 JSON 폴더 경로
+     */
+    public PromptEditorManager(Plugin plugin, String folderPath) {
         this.plugin = plugin;
-        this.promptSelector = new NpcFileSelector(plugin);
-        this.promptDataFolder = new File(plugin.getDataFolder(), "promptData");
-        if (!promptDataFolder.exists()) {
-            promptDataFolder.mkdirs();
+
+        // 절대/상대 경로 처리
+        File folder = new File(folderPath);
+        if (!folder.isAbsolute()) {
+            folder = new File(plugin.getDataFolder(), folderPath);
         }
-    }
-
-    /**
-     * NPC 편집 GUI를 생성 및 표시합니다.
-     */
-    public void openNpcEditGUI(Player player) {
-        if (currentData == null) {
-            plugin.getLogger().warning("저장된 NPC 데이터를 불러오지 못했습니다.");
-            return;
+        this.promptDataFolder = folder;
+        if (!promptDataFolder.exists() && !promptDataFolder.mkdirs()) {
+            plugin.getLogger().severe("프롬프트 폴더 생성 실패: " + promptDataFolder.getPath());
         }
-        // 27칸 GUI 생성
-        Inventory gui = Bukkit.createInventory(null, 27, "NPC 편집 - " + currentData.name);
 
-        // 1) NPC 머리 아이콘 (슬롯 10)
-        ItemStack head = new ItemStack(Material.PLAYER_HEAD);
-        gui.setItem(10, head);
-
-        // 2) 속성 필드: 이름, 나이, 성별, 직업, 성격, 배경
-        setFieldItem(gui, 12, "이름", currentData.name);
-        setFieldItem(gui, 13, "나이", currentData.age);
-        setFieldItem(gui, 14, "성별", currentData.gender);
-        setFieldItem(gui, 15, "직업", currentData.job);
-        setFieldItem(gui, 16, "성격", String.join(", ", currentData.personality));
-        setFieldItem(gui, 21, "배경", currentData.background);
-
-        // 3) 저장 / 닫기 버튼
-        ItemStack saveBtn = new ItemStack(Material.LIME_CONCRETE);
-        ItemMeta saveMeta = saveBtn.getItemMeta();
-        saveMeta.setDisplayName("✔ 저장");
-        saveBtn.setItemMeta(saveMeta);
-        gui.setItem(23, saveBtn);
-
-        ItemStack cancelBtn = new ItemStack(Material.RED_CONCRETE);
-        ItemMeta cancelMeta = cancelBtn.getItemMeta();
-        cancelMeta.setDisplayName("✖ 닫기");
-        cancelBtn.setItemMeta(cancelMeta);
-        gui.setItem(24, cancelBtn);
-
-        // 플레이어에게 GUI 오픈
-        player.openInventory(gui);
+        this.promptSelector = new NpcFileSelector(plugin, promptDataFolder);
     }
 
-    // 편의 메소드: 인벤토리에 필드 항목 세팅
-    private void setFieldItem(Inventory gui, int slot, String label, String value) {
-        ItemStack item = new ItemStack(Material.PAPER);
-        ItemMeta meta = item.getItemMeta();
-        meta.setDisplayName(label + ": " + value);
-        item.setItemMeta(meta);
-        gui.setItem(slot, item);
-    }
-
-    /**
-     * JSON 프롬프트 선택 GUI 열기 (NPC 생성 시 호출)
-     */
-    public void openPromptSelectGUI(Player player, Villager npc) {
-        promptSelector.openGUI(player, npc);
-    }
-
-    /**
-     * GUI 이벤트 핸들러에서 접근할 수 있도록 셀렉터를 외부로 노출
-     */
-    public NpcFileSelector getPromptSelector() {
-        return promptSelector;
-    }
-
-    /**
-     * 현재 로드된 PromptData를 반환합니다.
-     */
+    /** 현재 로드된 PromptData 반환 */
     public PromptData getCurrentData() {
         return currentData;
     }
 
-    /**
-     * 현재 로드된 PromptData를 JSON 파일로 저장합니다.
-     */
-    public void saveNpcData() {
-        if (currentData == null || currentDataFile == null) {
-            plugin.getLogger().warning("저장할 NPC 데이터가 없습니다.");
-            return;
-        }
-        Gson gson = new GsonBuilder().setPrettyPrinting().create();
-        try (Writer writer = new FileWriter(currentDataFile)) {
-            gson.toJson(currentData, writer);
-        } catch (IOException e) {
-            plugin.getLogger().severe("NPC 데이터 저장 실패: " + e.getMessage());
-        }
-    }
-
-    /**
-     * name 필드가 주어진 값과 일치하는 JSON을 로드하여 currentData로 설정합니다.
-     * @param name 찾을 NPC 이름
-     * @return 성공적으로 로드되면 true, 그렇지 않으면 false
-     */
+    /** JSON 파일에서 name 필드로 데이터 로드 */
     public boolean loadPromptDataByName(String name) {
-        File[] files = promptDataFolder.listFiles((dir, fname) -> fname.endsWith(".json"));
-        if (files == null) {
-            plugin.getLogger().warning("프롬프트 데이터 폴더를 찾을 수 없습니다.");
-            return false;
-        }
+        File[] files = promptDataFolder.listFiles((dir, f) -> f.endsWith(".json"));
+        if (files == null) return false;
+
         Gson gson = new Gson();
-        for (File file : files) {
-            try (Reader reader = new FileReader(file)) {
-                PromptData data = gson.fromJson(reader, PromptData.class);
-                if (data != null && data.name != null && data.name.equals(name)) {
-                    this.currentData = data;
-                    this.currentDataFile = file;
+        for (File f : files) {
+            try (Reader r = new FileReader(f)) {
+                PromptData d = gson.fromJson(r, PromptData.class);
+                if (d != null && name.equals(d.name)) {
+                    this.currentData = d;
+                    this.currentDataFile = f;
                     return true;
                 }
-            } catch (IOException e) {
-                plugin.getLogger().severe("PromptData 파일 읽기 실패: " + file.getName() + " - " + e.getMessage());
+            } catch (IOException ex) {
+                plugin.getLogger().severe("PromptData 로드 실패: " + f.getName());
             }
         }
         return false;
+    }
+
+    /** currentData를 JSON으로 덮어쓰기 */
+    public void saveNpcData() {
+        if (currentData == null || currentDataFile == null) return;
+
+        Gson gson = new GsonBuilder().setPrettyPrinting().create();
+        try (Writer w = new FileWriter(currentDataFile)) {
+            gson.toJson(currentData, w);
+        } catch (IOException ex) {
+            plugin.getLogger().severe("NPC 데이터 저장 실패: " + ex.getMessage());
+        }
+    }
+
+    /** 편집 GUI 열기 */
+    public void openNpcEditGUI(Player player) {
+        if (currentData == null) {
+            player.sendMessage("§c불러온 NPC 데이터가 없습니다.");
+            return;
+        }
+
+        Inventory gui = Bukkit.createInventory(null, 27, "NPC 편집 - " + currentData.name);
+        // 머리 아이콘
+        gui.setItem(10, new ItemStack(Material.PLAYER_HEAD));
+        // 필드
+        setField(gui, 12, "이름", currentData.name);
+        setField(gui, 13, "나이", currentData.age);
+        setField(gui, 14, "성별", currentData.gender);
+        setField(gui, 15, "직업", currentData.job);
+        setField(gui, 16, "성격", String.join(", ", currentData.personality));
+        setField(gui, 21, "배경", currentData.background);
+        // 저장/취소
+        setButton(gui, 23, Material.LIME_CONCRETE, "✔ 저장");
+        setButton(gui, 24, Material.RED_CONCRETE, "✖ 닫기");
+
+        player.openInventory(gui);
+    }
+
+    private void setField(Inventory gui, int slot, String label, String value) {
+        ItemStack item = new ItemStack(Material.PAPER);
+        ItemMeta m = item.getItemMeta();
+        m.setDisplayName(label + ": " + value);
+        item.setItemMeta(m);
+        gui.setItem(slot, item);
+    }
+
+    private void setButton(Inventory gui, int slot, Material mat, String name) {
+        ItemStack b = new ItemStack(mat);
+        ItemMeta m = b.getItemMeta();
+        m.setDisplayName(name);
+        b.setItemMeta(m);
+        gui.setItem(slot, b);
+    }
+
+    /** 프롬프트 선택 GUI 열기 */
+    public void openPromptSelectGUI(Player player, Villager npc) {
+        promptSelector.openGUI(player, npc);
     }
 }
