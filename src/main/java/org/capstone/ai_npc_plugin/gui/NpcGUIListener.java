@@ -16,6 +16,8 @@ import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.plugin.Plugin;
 import org.capstone.ai_npc_plugin.npc.PromptData;
 import org.capstone.ai_npc_plugin.gui.PromptEditorManager;
+import org.bukkit.event.inventory.InventoryClickEvent;
+import org.bukkit.event.inventory.InventoryDragEvent;
 
 import java.util.*;
 
@@ -230,5 +232,19 @@ public class NpcGUIListener implements Listener {
         m.setDisplayName(name);
         it.setItemMeta(m);
         return it;
+    }
+
+    @EventHandler
+    public void onInventoryClick(InventoryClickEvent e) {
+        if (!e.getView().getTitle().equals("📋 NPC 선택")) return;
+        e.setCancelled(true);  // 아이템 이동/중복 클릭 방지
+        // ↓ 기존 handleClick 로직 전체를 이 메서드로 옮기세요.
+    }
+
+    @EventHandler
+    public void onInventoryDrag(InventoryDragEvent e) {
+        if (e.getView().getTitle().equals("📋 NPC 선택")) {
+            e.setCancelled(true);
+        }
     }
 }

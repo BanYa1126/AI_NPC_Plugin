@@ -11,16 +11,17 @@ import org.bukkit.plugin.Plugin;
 import org.capstone.ai_npc_plugin.npc.PromptData;
 
 import java.io.File;
-import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
-import java.io.Reader;
 import java.io.Writer;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.lang.reflect.Type;
 import com.google.gson.reflect.TypeToken;
+import java.io.FileInputStream;
+import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
 
 public class PromptEditorManager {
     private final Plugin plugin;
@@ -62,20 +63,19 @@ public class PromptEditorManager {
         }
 
         Gson gson = new GsonBuilder().setPrettyPrinting().create();
-        try (Reader reader = new FileReader(file)) {
+        try (InputStreamReader reader = new InputStreamReader(
+                new FileInputStream(file),
+                StandardCharsets.UTF_8
+        )) {
             JsonElement je = JsonParser.parseReader(reader);
 
             if (je.isJsonArray()) {
-                // 배열인 경우 기존 로직
-                Type listType = new TypeToken<List<PromptData>>(){}.getType();
+                Type listType = new TypeToken<List<PromptData>>() {}.getType();
                 allData = gson.fromJson(je, listType);
-
             } else if (je.isJsonObject()) {
-                // 단일 객체인 경우에도 처리
                 PromptData single = gson.fromJson(je, PromptData.class);
                 allData = new ArrayList<>();
                 allData.add(single);
-
             } else {
                 plugin.getLogger().severe("지원하지 않는 JSON 형식입니다: root is " + je);
                 return false;
@@ -83,7 +83,6 @@ public class PromptEditorManager {
 
             currentDataFile = file;
             return true;
-
         } catch (IOException e) {
             plugin.getLogger().severe("NPC 데이터 로드 실패: " + e.getMessage());
             return false;
@@ -106,8 +105,11 @@ public class PromptEditorManager {
 
         Gson gson = new Gson();
         for (File f : files) {
-            try (Reader r = new FileReader(f)) {
-                PromptData d = gson.fromJson(r, PromptData.class);
+            try (InputStreamReader reader = new InputStreamReader(
+                    new FileInputStream(f),
+                    StandardCharsets.UTF_8
+            )) {
+                PromptData d = gson.fromJson(reader, PromptData.class);
                 if (d != null && name.equals(d.name)) {
                     this.currentData = d;
                     this.currentDataFile = f;
