@@ -8,7 +8,10 @@ import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
 import org.bukkit.entity.Player;
 import org.bukkit.entity.Villager;
+import org.bukkit.event.Listener;
+import org.bukkit.event.EventHandler;
 import org.bukkit.event.inventory.InventoryClickEvent;
+import org.bukkit.event.inventory.InventoryDragEvent;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
@@ -16,12 +19,14 @@ import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.plugin.Plugin;
 
 import java.io.File;
-import java.io.FileReader;
+import java.io.FileInputStream;
 import java.io.IOException;
+import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.stream.Collectors;
 
-public class NpcFileSelector {
+public class NpcFileSelector implements Listener {
 
     private final Plugin plugin;
     private final File jsonFolder;
@@ -36,6 +41,8 @@ public class NpcFileSelector {
         this.plugin = plugin;
         this.jsonFolder = jsonFolder;
         if (!jsonFolder.exists()) jsonFolder.mkdirs();
+        // 이벤트 리스너 등록
+        Bukkit.getPluginManager().registerEvents(this, plugin);
     }
 
     public void openGUI(Player player, Villager npc) {
@@ -48,11 +55,9 @@ public class NpcFileSelector {
         for (int i = idx; i < end; i++) {
             File f = files.get(i);
             String jsonName = "";
-            try (FileReader reader = new FileReader(f)) {
+            try (InputStreamReader reader = new InputStreamReader(new FileInputStream(f), StandardCharsets.UTF_8)) {
                 JsonObject obj = JsonParser.parseReader(reader).getAsJsonObject();
-                if (obj.has("name")) {
-                    jsonName = obj.get("name").getAsString();
-                }
+                if (obj.has("name")) jsonName = obj.get("name").getAsString();
             } catch (IOException e) {
                 plugin.getLogger().warning("프롬프트 파싱 실패: " + f.getName());
             }
@@ -60,12 +65,12 @@ public class NpcFileSelector {
             ItemStack it = new ItemStack(Material.PAPER);
             ItemMeta m = it.getItemMeta();
 
-            // 파일명은 흰색 displayName
+            // 파일명 displayName
             m.setDisplayName(ChatColor.WHITE + f.getName());
-            // lore에는 JSON 내부 name만 회색으로 표시
+            // lore: JSON 내부 name
             m.setLore(Collections.singletonList(ChatColor.GRAY + jsonName));
 
-            // 선택된 파일 강조 (노란색+✔)
+            // 선택 강조
             String sel = playerSelected.get(player.getUniqueId());
             if (f.getName().equals(sel)) {
                 m.setDisplayName(ChatColor.YELLOW + "✔ " + f.getName());
@@ -76,11 +81,11 @@ public class NpcFileSelector {
             it.setItemMeta(m);
 
             int slot = i - idx;
-            if (slot >= FILES_PER_PAGE) break;  // 마지막 줄 아이템 배치 방지
+            if (slot >= FILES_PER_PAGE) break;
             gui.setItem(slot, it);
         }
 
-        // “이전”/“다음” 버튼 중앙 하단
+        // 이전/다음 버튼 중앙 하단
         if (idx > 0)            gui.setItem(49, control(Material.LEVER, "이전"));
         if (end < files.size()) gui.setItem(50, control(Material.LEVER, "다음"));
 
@@ -92,7 +97,8 @@ public class NpcFileSelector {
         player.openInventory(gui);
     }
 
-    public void handleClick(InventoryClickEvent e) {
+    @EventHandler
+    public void onInventoryClick(InventoryClickEvent e) {
         if (!(e.getWhoClicked() instanceof Player p)) return;
         if (e.getCurrentItem() == null) return;
         if (!e.getView().getTitle().equals("📁 NPC 프롬프트 선택")) return;
@@ -117,6 +123,12 @@ public class NpcFileSelector {
                 }
             }
         }
+    }
+
+    @EventHandler
+    public void onInventoryDrag(InventoryDragEvent e) {
+        if (!"📁 NPC 프롬프트 선택".equals(e.getView().getTitle())) return;
+        e.setCancelled(true);
     }
 
     private void scroll(Player p, int delta) {
