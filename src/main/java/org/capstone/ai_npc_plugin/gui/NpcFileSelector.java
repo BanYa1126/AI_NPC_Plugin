@@ -1,5 +1,7 @@
 package org.capstone.ai_npc_plugin.gui;
 
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.Material;
@@ -14,6 +16,8 @@ import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.plugin.Plugin;
 
 import java.io.File;
+import java.io.FileReader;
+import java.io.IOException;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -21,12 +25,12 @@ public class NpcFileSelector {
 
     private final Plugin plugin;
     private final File jsonFolder;
-    private final int GUI_SIZE = 54;
-    private final int FILES_PER_PAGE = 45;
+    private static final int GUI_SIZE = 54;
+    private static final int FILES_PER_PAGE = 45;
 
-    private final Map<UUID, Integer> playerScroll = new HashMap<>();
-    private final Map<UUID, String> playerSelected = new HashMap<>();
-    private final Map<UUID, Villager> playerNpc = new HashMap<>();
+    private final Map<UUID, Integer> playerScroll   = new HashMap<>();
+    private final Map<UUID, String>  playerSelected = new HashMap<>();
+    private final Map<UUID, Villager> playerNpc     = new HashMap<>();
 
     public NpcFileSelector(Plugin plugin, File jsonFolder) {
         this.plugin = plugin;
@@ -43,18 +47,44 @@ public class NpcFileSelector {
 
         for (int i = idx; i < end; i++) {
             File f = files.get(i);
+            String jsonName = "";
+            try (FileReader reader = new FileReader(f)) {
+                JsonObject obj = JsonParser.parseReader(reader).getAsJsonObject();
+                if (obj.has("name")) {
+                    jsonName = obj.get("name").getAsString();
+                }
+            } catch (IOException e) {
+                plugin.getLogger().warning("프롬프트 파싱 실패: " + f.getName());
+            }
+
             ItemStack it = new ItemStack(Material.PAPER);
             ItemMeta m = it.getItemMeta();
+
+            // 파일명은 흰색 displayName
             m.setDisplayName(ChatColor.WHITE + f.getName());
+            // lore에는 JSON 내부 name만 회색으로 표시
+            m.setLore(Collections.singletonList(ChatColor.GRAY + jsonName));
+
+            // 선택된 파일 강조 (노란색+✔)
+            String sel = playerSelected.get(player.getUniqueId());
+            if (f.getName().equals(sel)) {
+                m.setDisplayName(ChatColor.YELLOW + "✔ " + f.getName());
+            }
+
             m.getPersistentDataContainer()
                     .set(new NamespacedKey(plugin, "filename"), PersistentDataType.STRING, f.getName());
             it.setItemMeta(m);
-            gui.setItem(i - idx, it);
+
+            int slot = i - idx;
+            if (slot >= FILES_PER_PAGE) break;  // 마지막 줄 아이템 배치 방지
+            gui.setItem(slot, it);
         }
 
-        if (idx > 0)          gui.setItem(45, control(Material.LEVER, "▲ 위로"));
-        if (end < files.size()) gui.setItem(46, control(Material.LEVER, "▼ 아래로"));
+        // “이전”/“다음” 버튼 중앙 하단
+        if (idx > 0)            gui.setItem(49, control(Material.LEVER, "이전"));
+        if (end < files.size()) gui.setItem(50, control(Material.LEVER, "다음"));
 
+        // 적용/취소 버튼 우측 하단
         gui.setItem(52, control(Material.LIME_CONCRETE, "✔ 적용"));
         gui.setItem(53, control(Material.RED_CONCRETE, "✘ 취소"));
 
@@ -70,19 +100,21 @@ public class NpcFileSelector {
 
         ItemMeta meta = e.getCurrentItem().getItemMeta();
         if (meta == null) return;
-        String name = ChatColor.stripColor(meta.getDisplayName());
+        String label = ChatColor.stripColor(meta.getDisplayName());
         String fn = meta.getPersistentDataContainer()
                 .get(new NamespacedKey(plugin, "filename"), PersistentDataType.STRING);
 
-        switch (name) {
-            case "▲ 위로" -> { scroll(p, -5); }
-            case "▼ 아래로" -> { scroll(p, +5); }
+        switch (label) {
+            case "이전" -> scroll(p, -FILES_PER_PAGE);
+            case "다음" -> scroll(p, +FILES_PER_PAGE);
             case "✔ 적용" -> apply(p);
             case "✘ 취소" -> p.closeInventory();
-            default -> { if (fn != null) {
-                playerSelected.put(p.getUniqueId(), fn);
-                p.sendMessage("📌 선택됨: " + fn);
-            }
+            default -> {
+                if (fn != null) {
+                    playerSelected.put(p.getUniqueId(), fn);
+                    p.sendMessage(ChatColor.GOLD + "📌 선택됨: " + ChatColor.WHITE + fn);
+                    openGUI(p, playerNpc.get(p.getUniqueId()));
+                }
             }
         }
     }
@@ -99,23 +131,23 @@ public class NpcFileSelector {
         Villager npc = playerNpc.get(p.getUniqueId());
         if (fn != null && npc != null) {
             npc.setCustomName("📜 " + fn.replace(".json", ""));
-            p.sendMessage("✅ 적용됨: " + fn);
+            p.sendMessage(ChatColor.GREEN + "✅ 적용됨: " + fn);
         } else {
-            p.sendMessage("⚠ 먼저 파일을 선택하세요.");
+            p.sendMessage(ChatColor.RED + "⚠ 먼저 파일을 선택하세요.");
         }
         p.closeInventory();
     }
 
-    private ItemStack control(Material m, String title) {
-        ItemStack it = new ItemStack(m);
-        ItemMeta meta = it.getItemMeta();
-        meta.setDisplayName(title);
-        it.setItemMeta(meta);
+    private ItemStack control(Material mat, String title) {
+        ItemStack it = new ItemStack(mat);
+        ItemMeta m = it.getItemMeta();
+        m.setDisplayName(title);
+        it.setItemMeta(m);
         return it;
     }
 
     private List<File> getSortedJsonFiles() {
-        File[] arr = jsonFolder.listFiles((d, n) -> n.endsWith(".json"));
+        File[] arr = jsonFolder.listFiles((d, n) -> n.toLowerCase().endsWith(".json"));
         if (arr == null) return Collections.emptyList();
         return Arrays.stream(arr).sorted().collect(Collectors.toList());
     }

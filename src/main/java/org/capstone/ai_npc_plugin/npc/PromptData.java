@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class PromptData {
+    public int number;
     public String name = "";
     public String age = "";
     public String gender = "";
