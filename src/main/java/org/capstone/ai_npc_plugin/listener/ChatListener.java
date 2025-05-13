@@ -6,26 +6,32 @@ import org.bukkit.event.Listener;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.player.AsyncPlayerChatEvent;
 import org.capstone.ai_npc_plugin.network.ModelSocketClient;
+import org.capstone.ai_npc_plugin.network.PersistentModelClient;
 
 public class ChatListener implements Listener {
+
+    private final PersistentModelClient modelClient = new PersistentModelClient();
+
+    public ChatListener() {
+        modelClient.connect();  // 서버 시작 시 1회 연결
+    }
 
     @EventHandler
     public void onPlayerChat(AsyncPlayerChatEvent event) {
         Player player = event.getPlayer();
-        String playerMessage = event.getMessage();
+        String message = event.getMessage();
 
-        // 비동기 스레드로 모델에 요청
         Bukkit.getScheduler().runTaskAsynchronously(
                 Bukkit.getPluginManager().getPlugin("AI_NPC_Plugin"),
                 () -> {
-                    String npcResponse = ModelSocketClient.getNPCResponse(player.getName(), playerMessage);
-
-                    // 응답을 메인 스레드에서 출력
-                    Bukkit.getScheduler().runTask(
-                            Bukkit.getPluginManager().getPlugin("AI_NPC_Plugin"),
-                            () -> player.sendMessage("§e[NPC]§f " + npcResponse)
-                    );
+                    String response = modelClient.sendMessage(player.getName(), message);
+                    Bukkit.getScheduler().runTask(Bukkit.getPluginManager().getPlugin("AI_NPC_Plugin"),
+                            () -> player.sendMessage("§e[NPC]§f " + response));
                 }
         );
+    }
+
+    public void shutdown() {
+        modelClient.disconnect();
     }
 }

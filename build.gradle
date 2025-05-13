@@ -59,7 +59,7 @@ processResources {
 }
 
 tasks.jar{
-    archiveFileName = 'PaperEduPlugin.jar'
+    archiveFileName = 'AI_NPC_Plugin.jar'
     destinationDirectory = file('D://PJ//Minecraft_Server//plugins')
 }
 

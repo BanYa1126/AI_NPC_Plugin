@@ -3,9 +3,11 @@ version: '1.0-SNAPSHOT'
 main: org.capstone.ai_npc_plugin.AI_NPC_Plugin
 api-version: '1.20'
 commands:
-  model:
-    description: 모델 서버를 제어합니다.
-    usage: /model on | off
   ainpc:
-    description: AI NPC를 생성 및 관리합니다.
-    usage: /ainpc create | prompt_fix | remove | reset | chatlog
+    description: AI NPC 제어 명령어
+    usage: /ainpc <create|remove|prompt_fix|reset|chatlog>
+    aliases: []
+  model:
+    description: 모델 제어 명령어
+    usage: /model <on|off|reload|status>
+    aliases: []

@@ -45,7 +45,7 @@ public class ModelCommand implements CommandExecutor {
                 return true;
 
             case "reload":
-                plugin.getNpcManager().loadNpcData("npc"); // npc.json 재로드
+                boolean loaded = plugin.getNpcManager().loadPromptDataByName("npc"); // npc.json 재로드
                 PromptData data = plugin.getNpcManager().getCurrentData();
 
                 if (data != null) {
