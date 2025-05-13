@@ -2,6 +2,8 @@ package org.capstone.ai_npc_plugin.gui;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonParser;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 import org.bukkit.entity.Villager;
@@ -14,6 +16,7 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.io.Reader;
 import java.io.Writer;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.lang.reflect.Type;
@@ -52,19 +55,39 @@ public class PromptEditorManager {
      * 기본 JSON 파일 이름(npc.json 등)로 로드
      */
     public boolean loadNpcData(String baseName) {
-        Gson gson = new GsonBuilder().setPrettyPrinting().create();
         File file = new File(promptDataFolder, baseName + ".json");
-        if (!file.exists()) return false;
+        if (!file.exists()) {
+            plugin.getLogger().warning("NPC 데이터 파일이 없습니다: " + file);
+            return false;
+        }
 
+        Gson gson = new GsonBuilder().setPrettyPrinting().create();
         try (Reader reader = new FileReader(file)) {
-            Type listType = new TypeToken<List<PromptData>>() {}.getType();
-            allData = gson.fromJson(reader, listType);
+            JsonElement je = JsonParser.parseReader(reader);
+
+            if (je.isJsonArray()) {
+                // 배열인 경우 기존 로직
+                Type listType = new TypeToken<List<PromptData>>(){}.getType();
+                allData = gson.fromJson(je, listType);
+
+            } else if (je.isJsonObject()) {
+                // 단일 객체인 경우에도 처리
+                PromptData single = gson.fromJson(je, PromptData.class);
+                allData = new ArrayList<>();
+                allData.add(single);
+
+            } else {
+                plugin.getLogger().severe("지원하지 않는 JSON 형식입니다: root is " + je);
+                return false;
+            }
+
             currentDataFile = file;
             return true;
+
         } catch (IOException e) {
             plugin.getLogger().severe("NPC 데이터 로드 실패: " + e.getMessage());
+            return false;
         }
-        return false;
     }
 
     /**
