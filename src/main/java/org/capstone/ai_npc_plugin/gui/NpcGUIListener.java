@@ -8,6 +8,7 @@ import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.inventory.InventoryClickEvent;
+import org.bukkit.event.inventory.InventoryDragEvent;
 import org.bukkit.event.player.AsyncPlayerChatEvent;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
@@ -15,9 +16,6 @@ import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.plugin.Plugin;
 import org.capstone.ai_npc_plugin.npc.PromptData;
-import org.capstone.ai_npc_plugin.gui.PromptEditorManager;
-import org.bukkit.event.inventory.InventoryClickEvent;
-import org.bukkit.event.inventory.InventoryDragEvent;
 
 import java.util.*;
 
@@ -27,15 +25,13 @@ public class NpcGUIListener implements Listener {
     private static final int GUI_SIZE = 54;
     private static final int ITEMS_PER_PAGE = 45;
 
-    // 페이지 및 선택 번호 저장
-    private final Map<UUID, Integer> playerPage     = new HashMap<>();
+    private final Map<UUID, Integer> playerPage = new HashMap<>();
     private final Map<UUID, Integer> playerSelected = new HashMap<>();
 
-    // 편집 상태 저장 (단계별 처리)
     private static class EditState {
         PromptData data;
-        int step;            // 0=필드선택, 1=새값입력
-        int selectedField;   // 1~6
+        int step;          // 0 = 필드선택, 1 = 새값입력
+        int selectedField;
     }
     private final Map<UUID, EditState> editing = new HashMap<>();
 
@@ -58,14 +54,14 @@ public class NpcGUIListener implements Listener {
             ItemStack item = new ItemStack(Material.PAPER);
             ItemMeta meta = item.getItemMeta();
 
-            // 제목: 번호 표시 + 선택 강조
+            // 제목과 선택 강조
             String title = ChatColor.WHITE + String.valueOf(data.number);
             if (selectedNumber != null && selectedNumber.equals(data.number)) {
                 title = ChatColor.YELLOW + "✔ " + data.number;
             }
             meta.setDisplayName(title);
 
-            // lore: 상세 필드
+            // lore 설정
             List<String> lore = new ArrayList<>();
             lore.add(ChatColor.GRAY + "Name: " + data.name);
             lore.add(ChatColor.GRAY + "Age: " + data.age);
@@ -78,7 +74,7 @@ public class NpcGUIListener implements Listener {
             }
             meta.setLore(lore);
 
-            // key 저장
+            // npc_number 저장
             meta.getPersistentDataContainer().set(
                     new NamespacedKey(plugin, "npc_number"),
                     PersistentDataType.INTEGER,
@@ -91,17 +87,17 @@ public class NpcGUIListener implements Listener {
             gui.setItem(slot, item);
         }
 
-        // 이전/다음
-        if (page > 0)            gui.setItem(49, control(Material.LEVER, "이전"));
+        // 페이징 및 컨트롤 버튼
+        if (page > 0) gui.setItem(49, control(Material.LEVER, "이전"));
         if (end < manager.getAllData().size()) gui.setItem(50, control(Material.LEVER, "다음"));
-        // 변경/취소
         gui.setItem(52, control(Material.LIME_CONCRETE, "✔ 변경"));
         gui.setItem(53, control(Material.RED_CONCRETE, "✘ 취소"));
 
         player.openInventory(gui);
     }
 
-    public void handleClick(InventoryClickEvent e) {
+    @EventHandler
+    public void onInventoryClick(InventoryClickEvent e) {
         if (!(e.getWhoClicked() instanceof Player p)) return;
         if (!e.getView().getTitle().equals("📋 NPC 선택")) return;
         e.setCancelled(true);
@@ -118,37 +114,29 @@ public class NpcGUIListener implements Listener {
                 openSelector(p);
             }
             case "다음" -> {
-                int pg = playerPage.getOrDefault(p.getUniqueId(), 0);
-                playerPage.put(p.getUniqueId(), pg + 1);
+                int pg2 = playerPage.getOrDefault(p.getUniqueId(), 0);
+                playerPage.put(p.getUniqueId(), pg2 + 1);
                 openSelector(p);
             }
             case "✔ 변경" -> {
                 Integer sel = playerSelected.get(p.getUniqueId());
-                if (sel != null) {
-                    manager.setCurrentData(sel);
-                    // 채팅으로 필드 선택 요청
-                    PromptData d = manager.getCurrentData();
+                if (sel != null && manager.setCurrentData(sel)) {
                     EditState st = new EditState();
-                    st.data = d;
+                    st.data = manager.getCurrentData();
                     st.step = 0;
                     editing.put(p.getUniqueId(), st);
                     p.closeInventory();
-                    // 항목 리스트 출력
                     p.sendMessage(ChatColor.YELLOW + "수정할 항목 번호를 입력하세요:");
                     String[] fields = {"name","age","gender","job","personality","background"};
                     for (int i = 0; i < fields.length; i++) {
-                        p.sendMessage(ChatColor.GOLD.toString() + (i + 1) + ". " + fields[i] + " : " + getFieldValue(d, fields[i]));
+                        p.sendMessage(ChatColor.GOLD + "" + (i+1) + ". " + fields[i] + " : " + getFieldValue(st.data, fields[i]));
                     }
                 } else {
                     p.sendMessage(ChatColor.RED + "먼저 NPC를 선택하세요.");
-                    p.closeInventory();
                 }
             }
-            case "✘ 취소" -> {
-                p.closeInventory();
-            }
+            case "✘ 취소" -> p.closeInventory();
             default -> {
-                // 번호 선택
                 Integer num = meta.getPersistentDataContainer()
                         .get(new NamespacedKey(plugin, "npc_number"), PersistentDataType.INTEGER);
                 if (num != null) {
@@ -157,6 +145,13 @@ public class NpcGUIListener implements Listener {
                     openSelector(p);
                 }
             }
+        }
+    }
+
+    @EventHandler
+    public void onInventoryDrag(InventoryDragEvent e) {
+        if (e.getView().getTitle().equals("📋 NPC 선택")) {
+            e.setCancelled(true);
         }
     }
 
@@ -170,7 +165,6 @@ public class NpcGUIListener implements Listener {
         String msg = e.getMessage().trim();
 
         if (st.step == 0) {
-            // 필드 번호 입력 처리
             try {
                 int idx = Integer.parseInt(msg);
                 if (idx >= 1 && idx <= 6) {
@@ -183,20 +177,18 @@ public class NpcGUIListener implements Listener {
             } catch (NumberFormatException ex) {
                 p.sendMessage(ChatColor.RED + "숫자를 입력해주세요.");
             }
-        } else if (st.step == 1) {
-            // 새 값 입력 처리
+        } else {
             PromptData d = st.data;
             String val = msg;
             switch (st.selectedField) {
-                case 1 -> d.name = val;
-                case 2 -> d.age = val;
-                case 3 -> d.gender = val;
-                case 4 -> d.job = val;
-                case 5 -> d.personality = Arrays.asList(val.split(",\\s*"));
-                case 6 -> d.background = val;
+                case 1: d.name = val; break;
+                case 2: d.age = val; break;
+                case 3: d.gender = val; break;
+                case 4: d.job = val; break;
+                case 5: d.personality = Arrays.asList(val.split(",\\s*")); break;
+                case 6: d.background = val; break;
             }
-            // 파일에 저장
-            Bukkit.getScheduler().runTask(plugin, () -> manager.saveNpcData());
+            Bukkit.getScheduler().runTask(plugin, manager::saveNpcData);
             p.sendMessage(ChatColor.GREEN + "✔ 수정 완료: " + getFieldName(st.selectedField) + " -> " + val);
             editing.remove(p.getUniqueId());
         }
@@ -232,19 +224,5 @@ public class NpcGUIListener implements Listener {
         m.setDisplayName(name);
         it.setItemMeta(m);
         return it;
-    }
-
-    @EventHandler
-    public void onInventoryClick(InventoryClickEvent e) {
-        if (!e.getView().getTitle().equals("📋 NPC 선택")) return;
-        e.setCancelled(true);  // 아이템 이동/중복 클릭 방지
-        // ↓ 기존 handleClick 로직 전체를 이 메서드로 옮기세요.
-    }
-
-    @EventHandler
-    public void onInventoryDrag(InventoryDragEvent e) {
-        if (e.getView().getTitle().equals("📋 NPC 선택")) {
-            e.setCancelled(true);
-        }
     }
 }
