@@ -11,9 +11,7 @@ import org.bukkit.plugin.Plugin;
 import org.capstone.ai_npc_plugin.npc.PromptData;
 
 import java.io.File;
-import java.io.FileWriter;
 import java.io.IOException;
-import java.io.Writer;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -22,6 +20,8 @@ import com.google.gson.reflect.TypeToken;
 import java.io.FileInputStream;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
+import java.io.FileOutputStream;
+import java.io.OutputStreamWriter;
 
 public class PromptEditorManager {
     private final Plugin plugin;
@@ -126,9 +126,11 @@ public class PromptEditorManager {
      * currentData를 JSON으로 덮어쓰기
      */
     public void saveNpcData() {
-        if (allData == null || currentDataFile == null) return;
         Gson gson = new GsonBuilder().setPrettyPrinting().create();
-        try (Writer w = new FileWriter(currentDataFile)) {
+        try (OutputStreamWriter w = new OutputStreamWriter(
+                new FileOutputStream(currentDataFile),
+                StandardCharsets.UTF_8
+        )) {
             gson.toJson(allData, w);
         } catch (IOException ex) {
             plugin.getLogger().severe("NPC 데이터 저장 실패: " + ex.getMessage());

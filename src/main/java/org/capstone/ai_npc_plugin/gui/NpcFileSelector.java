@@ -25,6 +25,8 @@ import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.stream.Collectors;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonArray;
 
 public class NpcFileSelector implements Listener {
 
@@ -55,9 +57,32 @@ public class NpcFileSelector implements Listener {
         for (int i = idx; i < end; i++) {
             File f = files.get(i);
             String jsonName = "";
-            try (InputStreamReader reader = new InputStreamReader(new FileInputStream(f), StandardCharsets.UTF_8)) {
-                JsonObject obj = JsonParser.parseReader(reader).getAsJsonObject();
-                if (obj.has("name")) jsonName = obj.get("name").getAsString();
+
+            // UTF-8 로 한글 깨짐 없이 읽으면서, root 가 Object인지 Array인지 체크
+            try (InputStreamReader reader = new InputStreamReader(
+                    new FileInputStream(f), StandardCharsets.UTF_8)) {
+
+                JsonElement root = JsonParser.parseReader(reader);
+                if (root.isJsonObject()) {
+                    JsonObject obj = root.getAsJsonObject();
+                    if (obj.has("name")) {
+                        jsonName = obj.get("name").getAsString();
+                    }
+                } else if (root.isJsonArray()) {
+                    JsonArray arr = root.getAsJsonArray();
+                    List<String> names = new ArrayList<>();
+                    for (JsonElement el : arr) {
+                        if (el.isJsonObject()) {
+                            JsonObject o = el.getAsJsonObject();
+                            if (o.has("name")) {
+                                names.add(o.get("name").getAsString());
+                            }
+                        }
+                    }
+                    // 배열 안의 모든 name 을 콤마로 이어 붙임
+                    jsonName = String.join(", ", names);
+                }
+
             } catch (IOException e) {
                 plugin.getLogger().warning("프롬프트 파싱 실패: " + f.getName());
             }
