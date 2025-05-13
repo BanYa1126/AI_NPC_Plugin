@@ -6,16 +6,17 @@ import org.bukkit.command.*;
 import org.bukkit.entity.Player;
 import org.bukkit.entity.Villager;
 import org.capstone.ai_npc_plugin.AI_NPC_Plugin;
+import org.capstone.ai_npc_plugin.gui.PromptEditorManager;
 
 import java.util.*;
 
 public class AINPCCommand implements CommandExecutor {
 
     private final AI_NPC_Plugin plugin;
-    private final Set<UUID> nameInputWaiting = new HashSet<>();
-
-    public AINPCCommand(AI_NPC_Plugin plugin) {
-        this.plugin = plugin;
+    private final PromptEditorManager manager;
+    public AINPCCommand(AI_NPC_Plugin plugin, PromptEditorManager manager) {
+        this.plugin  = plugin;
+        this.manager = manager;
     }
 
     @Override
@@ -51,17 +52,15 @@ public class AINPCCommand implements CommandExecutor {
                 }
 
                 if (args.length < 2) {
-                    nameInputWaiting.add(player.getUniqueId());
-                    player.sendMessage(ChatColor.YELLOW + "수정할 NPC의 이름을 채팅으로 입력해주세요.");
+                    player.sendMessage(ChatColor.YELLOW + "사용법: /ainpc prompt_fix <파일명>");
                     return true;
                 }
-
-                String targetName = String.join(" ", Arrays.copyOfRange(args, 1, args.length));
-                if (plugin.getNpcManager().loadPromptDataByName(targetName)) {
-                    plugin.getNpcManager().openNpcEditGUI(player);
-                    player.sendMessage(ChatColor.GREEN + "NPC 프롬프트 GUI가 열렸습니다.");
+                String fileName = args[1];  // JSON 파일명 (확장자 제외)
+                if (manager.loadNpcData(fileName)) {
+                    manager.openNpcEditGUI(player);
+                    player.sendMessage(ChatColor.GREEN + "NPC 편집 GUI가 열렸습니다: " + fileName + ".json");
                 } else {
-                    player.sendMessage(ChatColor.RED + "해당 이름의 NPC를 찾을 수 없습니다.");
+                    player.sendMessage(ChatColor.RED + "해당 파일을 찾을 수 없습니다: " + fileName + ".json");
                 }
                 return true;
 
@@ -83,8 +82,5 @@ public class AINPCCommand implements CommandExecutor {
                 sender.sendMessage("알 수 없는 명령어입니다.");
                 return true;
         }
-    }
-    public Set<UUID> getNameInputWaiting() {
-        return nameInputWaiting;
     }
 }

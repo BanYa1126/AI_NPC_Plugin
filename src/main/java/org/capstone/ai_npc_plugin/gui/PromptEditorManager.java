@@ -5,7 +5,6 @@ import com.google.gson.GsonBuilder;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 import org.bukkit.entity.Villager;
-import org.bukkit.inventory.Inventory;
 import org.bukkit.plugin.Plugin;
 import org.capstone.ai_npc_plugin.npc.PromptData;
 
@@ -15,15 +14,17 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.io.Reader;
 import java.io.Writer;
-import java.util.ArrayList;
-import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
+import java.lang.reflect.Type;
+import com.google.gson.reflect.TypeToken;
 
 public class PromptEditorManager {
     private final Plugin plugin;
     private final File promptDataFolder;
     private final NpcFileSelector fileSelector;
     private final NpcGUIListener guiListener;
+    private List<PromptData> allData;
 
     private PromptData currentData;
     private File currentDataFile;
@@ -51,19 +52,15 @@ public class PromptEditorManager {
      * 기본 JSON 파일 이름(npc.json 등)로 로드
      */
     public boolean loadNpcData(String baseName) {
+        Gson gson = new GsonBuilder().setPrettyPrinting().create();
         File file = new File(promptDataFolder, baseName + ".json");
-        if (!file.exists()) {
-            plugin.getLogger().warning("프롬프트 파일이 존재하지 않습니다: " + file.getPath());
-            return false;
-        }
-        Gson gson = new Gson();
+        if (!file.exists()) return false;
+
         try (Reader reader = new FileReader(file)) {
-            PromptData data = gson.fromJson(reader, PromptData.class);
-            if (data != null) {
-                this.currentData = data;
-                this.currentDataFile = file;
-                return true;
-            }
+            Type listType = new TypeToken<List<PromptData>>() {}.getType();
+            allData = gson.fromJson(reader, listType);
+            currentDataFile = file;
+            return true;
         } catch (IOException e) {
             plugin.getLogger().severe("NPC 데이터 로드 실패: " + e.getMessage());
         }
@@ -104,10 +101,10 @@ public class PromptEditorManager {
      * currentData를 JSON으로 덮어쓰기
      */
     public void saveNpcData() {
-        if (currentData == null || currentDataFile == null) return;
+        if (allData == null || currentDataFile == null) return;
         Gson gson = new GsonBuilder().setPrettyPrinting().create();
         try (Writer w = new FileWriter(currentDataFile)) {
-            gson.toJson(currentData, w);
+            gson.toJson(allData, w);
         } catch (IOException ex) {
             plugin.getLogger().severe("NPC 데이터 저장 실패: " + ex.getMessage());
         }
@@ -131,30 +128,17 @@ public class PromptEditorManager {
      * JSON 폴더 내 모든 PromptData 리스트로 반환
      */
     public List<PromptData> getAllData() {
-        List<PromptData> list = new ArrayList<>();
-        Gson gson = new Gson();
-        File[] files = promptDataFolder.listFiles((d, n) -> n.toLowerCase().endsWith(".json"));
-        if (files == null) return list;
-        for (File f : files) {
-            try (Reader r = new FileReader(f)) {
-                PromptData d = gson.fromJson(r, PromptData.class);
-                if (d != null) list.add(d);
-            } catch (IOException e) {
-                plugin.getLogger().warning("데이터 로드 실패: " + f.getName());
-            }
-        }
-        list.sort((a, b) -> Integer.compare(a.number, b.number));
-        return list;
+        if (allData == null) return Collections.emptyList();
+        return allData;
     }
 
     /**
      * 번호로 지정된 PromptData를 currentData로 설정
      */
     public boolean setCurrentData(int number) {
-        for (PromptData d : getAllData()) {
+        for (PromptData d : allData) {
             if (d.number == number) {
-                this.currentData = d;
-                this.currentDataFile = new File(promptDataFolder, number + ".json");
+                currentData = d;
                 return true;
             }
         }

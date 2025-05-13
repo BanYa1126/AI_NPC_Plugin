@@ -21,10 +21,9 @@ public final class AI_NPC_Plugin extends JavaPlugin {
         promptEditorManager = new PromptEditorManager(this, folderPath);
 
         getCommand("model").setExecutor(new ModelCommand(this));
-        getCommand("ainpc").setExecutor(new AINPCCommand(this));
-
+        getCommand("ainpc")
+                .setExecutor(new AINPCCommand(this, promptEditorManager));
         getServer().getPluginManager().registerEvents(new ChatListener(), this);
-        getServer().getPluginManager().registerEvents(new NpcGUIListener(this, promptEditorManager), this);
 
         getLogger().info("AI_NPC_Plugin 활성화됨");
     }
