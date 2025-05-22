@@ -99,7 +99,7 @@ public class NpcGUIListener implements Listener {
     @EventHandler
     public void onInventoryClick(InventoryClickEvent e) {
         if (!(e.getWhoClicked() instanceof Player p)) return;
-        if (!e.getView().getTitle().equals("📋 NPC 선택")) return;
+        if (!e.getView().getTitle().equals("📋 수정할 NPC 데이터 선택")) return;
         e.setCancelled(true);
 
         ItemStack clicked = e.getCurrentItem();

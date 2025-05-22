@@ -52,7 +52,7 @@ public class NpcFileSelector implements Listener {
         int idx = playerScroll.getOrDefault(player.getUniqueId(), 0);
         int end = Math.min(idx + FILES_PER_PAGE, files.size());
 
-        Inventory gui = Bukkit.createInventory(null, GUI_SIZE, "📁 NPC 프롬프트 선택");
+        Inventory gui = Bukkit.createInventory(null, GUI_SIZE, "📁 적용할 NPC 프롬프트 파일 선택");
 
         for (int i = idx; i < end; i++) {
             File f = files.get(i);
