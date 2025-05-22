@@ -1,5 +1,7 @@
 package org.capstone.ai_npc_plugin.gui;
 
+import com.google.gson.JsonArray;
+import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import org.bukkit.Bukkit;
@@ -8,8 +10,8 @@ import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
 import org.bukkit.entity.Player;
 import org.bukkit.entity.Villager;
-import org.bukkit.event.Listener;
 import org.bukkit.event.EventHandler;
+import org.bukkit.event.Listener;
 import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.inventory.InventoryDragEvent;
 import org.bukkit.inventory.Inventory;
@@ -17,6 +19,8 @@ import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.plugin.Plugin;
+import org.capstone.ai_npc_plugin.npc.PromptData;
+import org.capstone.ai_npc_plugin.gui.NpcGUIListener;
 
 import java.io.File;
 import java.io.FileInputStream;
@@ -24,127 +28,159 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
-import java.util.stream.Collectors;
-import com.google.gson.JsonElement;
-import com.google.gson.JsonArray;
 
 public class NpcFileSelector implements Listener {
-
+    public enum Mode { PROMPT_SET, PROMPT_FIX }
+    private final PromptEditorManager manager;
     private final Plugin plugin;
     private final File jsonFolder;
+    private final NpcGUIListener fixListener;
+
     private static final int GUI_SIZE = 54;
     private static final int FILES_PER_PAGE = 45;
 
+    private final Map<UUID, Mode>    playerMode     = new HashMap<>();
     private final Map<UUID, Integer> playerScroll   = new HashMap<>();
     private final Map<UUID, String>  playerSelected = new HashMap<>();
-    private final Map<UUID, Villager> playerNpc     = new HashMap<>();
+    private final Map<UUID, Villager>playerNpc      = new HashMap<>();
 
-    public NpcFileSelector(Plugin plugin, File jsonFolder) {
-        this.plugin = plugin;
-        this.jsonFolder = jsonFolder;
+    public NpcFileSelector(Plugin plugin,
+                           File jsonFolder,
+                           PromptEditorManager manager,
+                           NpcGUIListener fixListener) {
+        this.plugin      = plugin;
+        this.jsonFolder  = jsonFolder;
+        this.manager     = manager;
+        this.fixListener = fixListener;
         if (!jsonFolder.exists()) jsonFolder.mkdirs();
-        // 이벤트 리스너 등록
         Bukkit.getPluginManager().registerEvents(this, plugin);
     }
 
-    public void openGUI(Player player, Villager npc) {
+    /** mode 에 따라 title 과 apply 버튼을 다르게 띄워 줍니다 */
+    public void openGUI(Player player, Villager npc, Mode mode) {
+        playerMode.put(player.getUniqueId(), mode);
+        playerNpc.put(player.getUniqueId(), npc);
+
         List<File> files = getSortedJsonFiles();
         int idx = playerScroll.getOrDefault(player.getUniqueId(), 0);
         int end = Math.min(idx + FILES_PER_PAGE, files.size());
 
-        Inventory gui = Bukkit.createInventory(null, GUI_SIZE, "📁 적용할 NPC 프롬프트 파일 선택");
+        String title = mode == Mode.PROMPT_SET
+                ? "📁 Prompt Set 선택"
+                : "📁 Prompt Fix 선택";
+        Inventory gui = Bukkit.createInventory(null, GUI_SIZE, title);
 
         for (int i = idx; i < end; i++) {
             File f = files.get(i);
             String jsonName = "";
-
-            // UTF-8 로 한글 깨짐 없이 읽으면서, root 가 Object인지 Array인지 체크
             try (InputStreamReader reader = new InputStreamReader(
                     new FileInputStream(f), StandardCharsets.UTF_8)) {
 
                 JsonElement root = JsonParser.parseReader(reader);
                 if (root.isJsonObject()) {
                     JsonObject obj = root.getAsJsonObject();
-                    if (obj.has("name")) {
-                        jsonName = obj.get("name").getAsString();
-                    }
+                    if (obj.has("name")) jsonName = obj.get("name").getAsString();
                 } else if (root.isJsonArray()) {
                     JsonArray arr = root.getAsJsonArray();
                     List<String> names = new ArrayList<>();
                     for (JsonElement el : arr) {
                         if (el.isJsonObject()) {
                             JsonObject o = el.getAsJsonObject();
-                            if (o.has("name")) {
-                                names.add(o.get("name").getAsString());
-                            }
+                            if (o.has("name")) names.add(o.get("name").getAsString());
                         }
                     }
-                    // 배열 안의 모든 name 을 콤마로 이어 붙임
                     jsonName = String.join(", ", names);
                 }
-
             } catch (IOException e) {
                 plugin.getLogger().warning("프롬프트 파싱 실패: " + f.getName());
             }
 
             ItemStack it = new ItemStack(Material.PAPER);
             ItemMeta m = it.getItemMeta();
+            boolean selected = f.getName().equals(playerSelected.get(player.getUniqueId()));
 
-            // 파일명 displayName
-            m.setDisplayName(ChatColor.WHITE + f.getName());
-            // lore: JSON 내부 name
+            m.setDisplayName(
+                    selected
+                            ? ChatColor.YELLOW + "✔ " + f.getName()
+                            : ChatColor.WHITE + f.getName()
+            );
             m.setLore(Collections.singletonList(ChatColor.GRAY + jsonName));
-
-            // 선택 강조
-            String sel = playerSelected.get(player.getUniqueId());
-            if (f.getName().equals(sel)) {
-                m.setDisplayName(ChatColor.YELLOW + "✔ " + f.getName());
-            }
-
             m.getPersistentDataContainer()
-                    .set(new NamespacedKey(plugin, "filename"), PersistentDataType.STRING, f.getName());
+                    .set(new NamespacedKey(plugin, "filename"),
+                            PersistentDataType.STRING,
+                            f.getName());
             it.setItemMeta(m);
 
-            int slot = i - idx;
-            if (slot >= FILES_PER_PAGE) break;
-            gui.setItem(slot, it);
+            gui.setItem(i - idx, it);
         }
 
-        // 이전/다음 버튼 중앙 하단
-        if (idx > 0)            gui.setItem(49, control(Material.LEVER, "이전"));
-        if (end < files.size()) gui.setItem(50, control(Material.LEVER, "다음"));
+        // 페이징
+        if (idx > 0)            gui.setItem(49, control(Material.LEVER, "이전 페이지"));
+        if (end < files.size()) gui.setItem(50, control(Material.LEVER, "다음 페이지"));
 
-        // 적용/취소 버튼 우측 하단
-        gui.setItem(52, control(Material.LIME_CONCRETE, "✔ 적용"));
+        // apply/cancel 버튼
+        String applyText = mode == Mode.PROMPT_SET ? "✔ 적용" : "✔ 선택";
+        gui.setItem(52, control(Material.LIME_CONCRETE, applyText));
         gui.setItem(53, control(Material.RED_CONCRETE, "✘ 취소"));
 
-        playerNpc.put(player.getUniqueId(), npc);
         player.openInventory(gui);
     }
 
     @EventHandler
     public void onInventoryClick(InventoryClickEvent e) {
         if (!(e.getWhoClicked() instanceof Player p)) return;
-        if (e.getCurrentItem() == null) return;
-        if (!e.getView().getTitle().equals("📁 NPC 프롬프트 선택")) return;
+        String title = e.getView().getTitle();
+        if (!title.startsWith("📁")) return;  // 우리가 연 GUI 만
         e.setCancelled(true);
 
-        ItemMeta meta = e.getCurrentItem().getItemMeta();
-        if (meta == null) return;
-        String label = ChatColor.stripColor(meta.getDisplayName());
-        String fn = meta.getPersistentDataContainer()
-                .get(new NamespacedKey(plugin, "filename"), PersistentDataType.STRING);
+        UUID id = p.getUniqueId();
+        Mode mode = playerMode.get(id);
+        ItemStack clicked = e.getCurrentItem();
+        if (clicked == null || !clicked.hasItemMeta()) return;
+
+        String label = ChatColor.stripColor(clicked.getItemMeta().getDisplayName());
+        String fn    = clicked.getItemMeta()
+                .getPersistentDataContainer()
+                .get(new NamespacedKey(plugin, "filename"),
+                        PersistentDataType.STRING);
 
         switch (label) {
-            case "이전" -> scroll(p, -FILES_PER_PAGE);
-            case "다음" -> scroll(p, +FILES_PER_PAGE);
-            case "✔ 적용" -> apply(p);
+            case "이전 페이지" -> {
+                playerScroll.put(id, Math.max(0, playerScroll.getOrDefault(id, 0) - FILES_PER_PAGE));
+                openGUI(p, playerNpc.get(id), mode);
+            }
+            case "다음 페이지" -> {
+                playerScroll.put(id, playerScroll.getOrDefault(id, 0) + FILES_PER_PAGE);
+                openGUI(p, playerNpc.get(id), mode);
+            }
             case "✘ 취소" -> p.closeInventory();
+            case "✔ 적용", "✔ 선택" -> {
+                if (fn == null) {
+                    p.sendMessage(ChatColor.RED + "먼저 파일을 선택하세요.");
+                    return;
+                }
+                // 공통: 파일 로드
+                if (!manager.loadPromptFile(fn)) {
+                    p.sendMessage(ChatColor.RED + "파일 로드에 실패했습니다: " + fn);
+                    p.closeInventory();
+                    return;
+                }
+
+                if (mode == Mode.PROMPT_SET) {
+                    p.sendMessage(ChatColor.GREEN + "프롬프트 파일 적용 완료: " + fn);
+                    p.closeInventory();
+
+                } else {
+                    p.closeInventory();
+                    manager.openNpcEditGUI(p);
+                }
+            }
             default -> {
+                // 파일 아이콘 클릭: 선택 강조만
                 if (fn != null) {
-                    playerSelected.put(p.getUniqueId(), fn);
-                    p.sendMessage(ChatColor.GOLD + "📌 선택됨: " + ChatColor.WHITE + fn);
-                    openGUI(p, playerNpc.get(p.getUniqueId()));
+                    playerSelected.put(id, fn);
+                    p.sendMessage(ChatColor.GOLD + "선택됨: " + fn);
+                    openGUI(p, playerNpc.get(id), mode);
                 }
             }
         }
@@ -152,40 +188,43 @@ public class NpcFileSelector implements Listener {
 
     @EventHandler
     public void onInventoryDrag(InventoryDragEvent e) {
-        if (!"📁 NPC 프롬프트 선택".equals(e.getView().getTitle())) return;
-        e.setCancelled(true);
-    }
-
-    private void scroll(Player p, int delta) {
-        UUID id = p.getUniqueId();
-        int cur = playerScroll.getOrDefault(id, 0);
-        playerScroll.put(id, Math.max(0, cur + delta));
-        openGUI(p, playerNpc.get(id));
-    }
-
-    private void apply(Player p) {
-        String fn = playerSelected.get(p.getUniqueId());
-        Villager npc = playerNpc.get(p.getUniqueId());
-        if (fn != null && npc != null) {
-            npc.setCustomName("📜 " + fn.replace(".json", ""));
-            p.sendMessage(ChatColor.GREEN + "✅ 적용됨: " + fn);
-        } else {
-            p.sendMessage(ChatColor.RED + "⚠ 먼저 파일을 선택하세요.");
+        if (e.getView().getTitle().startsWith("📁")) {
+            e.setCancelled(true);
         }
-        p.closeInventory();
     }
 
-    private ItemStack control(Material mat, String title) {
+    private String parseJsonNames(File f) {
+        try (InputStreamReader r = new InputStreamReader(new FileInputStream(f), StandardCharsets.UTF_8)) {
+            JsonElement root = JsonParser.parseReader(r);
+            if (root.isJsonObject()) {
+                JsonObject obj = root.getAsJsonObject();
+                return obj.has("name") ? obj.get("name").getAsString() : "";
+            } else if (root.isJsonArray()) {
+                List<String> names = new ArrayList<>();
+                for (JsonElement el : root.getAsJsonArray()) {
+                    if (el.isJsonObject()) {
+                        JsonObject o = el.getAsJsonObject();
+                        if (o.has("name")) names.add(o.get("name").getAsString());
+                    }
+                }
+                return String.join(", ", names);
+            }
+        } catch (IOException ignored) {}
+        return "";
+    }
+
+    private ItemStack control(Material mat, String name) {
         ItemStack it = new ItemStack(mat);
         ItemMeta m = it.getItemMeta();
-        m.setDisplayName(title);
+        m.setDisplayName(name);
         it.setItemMeta(m);
         return it;
     }
 
     private List<File> getSortedJsonFiles() {
-        File[] arr = jsonFolder.listFiles((d, n) -> n.toLowerCase().endsWith(".json"));
-        if (arr == null) return Collections.emptyList();
-        return Arrays.stream(arr).sorted().collect(Collectors.toList());
+        File[] arr = jsonFolder.listFiles((d,n)->n.toLowerCase().endsWith(".json"));
+        return arr==null
+                ? Collections.emptyList()
+                : Arrays.stream(arr).sorted().toList();
     }
 }

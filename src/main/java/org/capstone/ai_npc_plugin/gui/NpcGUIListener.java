@@ -5,6 +5,7 @@ import org.bukkit.ChatColor;
 import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
 import org.bukkit.entity.Player;
+import org.bukkit.entity.Villager;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.inventory.InventoryClickEvent;
@@ -20,6 +21,9 @@ import org.capstone.ai_npc_plugin.npc.PromptData;
 import java.util.*;
 
 public class NpcGUIListener implements Listener {
+    private enum DataMode { CREATE, FIX }
+    private final Map<UUID,DataMode> playerDataMode = new HashMap<>();
+    private final Map<UUID, Villager> playerNpcForCreate = new HashMap<>();
     private final Plugin plugin;
     private final PromptEditorManager manager;
     private static final int GUI_SIZE = 54;
@@ -40,26 +44,53 @@ public class NpcGUIListener implements Listener {
         this.manager = manager;
     }
 
-    public void openSelector(Player player) {
+    public void openFixSelector(Player player) {
+        playerDataMode.put(player.getUniqueId(), DataMode.FIX);
+        showDataGui(player, "📋 NPC 수정용 데이터 선택");
+    }
+
+    // 3) openCreateSelector: create 명령어에서 호출
+    public void openCreateSelector(Player player, Villager npc) {
+        playerDataMode.put(player.getUniqueId(), DataMode.CREATE);
+        playerNpcForCreate.put(player.getUniqueId(), npc);
+        showDataGui(player, "📋 NPC 생성용 데이터 선택");
+    }
+
+    private void openSelector(Player player) {
+        UUID id = player.getUniqueId();
+        DataMode mode = playerDataMode.get(id);
+        if (mode == DataMode.CREATE) {
+            // create 모드 → Villager 객체도 꺼내서 전달
+            Villager npc = playerNpcForCreate.get(id);
+            openCreateSelector(player, npc);
+        } else {
+            // fix 모드 → 단순히 수정용 선택 GUI
+            openFixSelector(player);
+        }
+    }
+
+    // 4) 공통 GUI 표시 헬퍼 (이 안에 기존 openSelector 코드를 통째로 이동)
+    private void showDataGui(Player player, String title) {
         List<PromptData> dataList = manager.getAllData();
-        int page = playerPage.getOrDefault(player.getUniqueId(), 0);
-        int start = page * ITEMS_PER_PAGE;
-        int end = Math.min(start + ITEMS_PER_PAGE, dataList.size());
+        int page    = playerPage.getOrDefault(player.getUniqueId(), 0);
+        int start   = page * ITEMS_PER_PAGE;
+        int end     = Math.min(start + ITEMS_PER_PAGE, dataList.size());
 
-        Inventory gui = Bukkit.createInventory(null, GUI_SIZE, "📋 NPC 선택");
-        Integer selectedNumber = playerSelected.get(player.getUniqueId());
+        Inventory gui = Bukkit.createInventory(null, GUI_SIZE, title);
+        Integer selNum = playerSelected.get(player.getUniqueId());
 
+        // — 기존 반복문: 아이템 세팅 그대로 —
         for (int i = start; i < end; i++) {
             PromptData data = dataList.get(i);
-            ItemStack item = new ItemStack(Material.PAPER);
-            ItemMeta meta = item.getItemMeta();
+            ItemStack item  = new ItemStack(Material.PAPER);
+            ItemMeta meta   = item.getItemMeta();
 
-            // 제목과 선택 강조
-            String title = ChatColor.WHITE + String.valueOf(data.number);
-            if (selectedNumber != null && selectedNumber.equals(data.number)) {
-                title = ChatColor.YELLOW + "✔ " + data.number;
+            // 제목 & 선택 강조
+            String disp = ChatColor.WHITE + String.valueOf(data.number);
+            if (selNum != null && selNum.equals(data.number)) {
+                disp = ChatColor.YELLOW + "✔ " + data.number;
             }
-            meta.setDisplayName(title);
+            meta.setDisplayName(disp);
 
             // lore 설정
             List<String> lore = new ArrayList<>();
@@ -69,7 +100,7 @@ public class NpcGUIListener implements Listener {
             lore.add(ChatColor.GRAY + "Job: " + data.job);
             lore.add(ChatColor.GRAY + "Personality: " + String.join(", ", data.personality));
             lore.add(ChatColor.GRAY + "Background: " + data.background);
-            if (selectedNumber != null && selectedNumber.equals(data.number)) {
+            if (selNum != null && selNum.equals(data.number)) {
                 lore.add(ChatColor.GOLD + "[선택됨]");
             }
             meta.setLore(lore);
@@ -87,10 +118,16 @@ public class NpcGUIListener implements Listener {
             gui.setItem(slot, item);
         }
 
-        // 페이징 및 컨트롤 버튼
-        if (page > 0) gui.setItem(49, control(Material.LEVER, "이전"));
-        if (end < manager.getAllData().size()) gui.setItem(50, control(Material.LEVER, "다음"));
-        gui.setItem(52, control(Material.LIME_CONCRETE, "✔ 변경"));
+        // 페이징 버튼
+        if (page > 0) gui.setItem(49, control(Material.LEVER, "이전 페이지"));
+        if (end < dataList.size()) gui.setItem(50, control(Material.LEVER, "다음 페이지"));
+
+        // ✔ 버튼 텍스트만 모드별로 바꿔 주기
+        DataMode mode = playerDataMode.get(player.getUniqueId());
+        String confirmText = (mode == DataMode.CREATE) ? "✔ 선택" : "✔ 변경";
+        gui.setItem(52, control(Material.LIME_CONCRETE, confirmText));
+
+        // 취소 버튼
         gui.setItem(53, control(Material.RED_CONCRETE, "✘ 취소"));
 
         player.openInventory(gui);
@@ -99,7 +136,8 @@ public class NpcGUIListener implements Listener {
     @EventHandler
     public void onInventoryClick(InventoryClickEvent e) {
         if (!(e.getWhoClicked() instanceof Player p)) return;
-        if (!e.getView().getTitle().equals("📋 수정할 NPC 데이터 선택")) return;
+        String title = e.getView().getTitle();
+        if (!title.startsWith("📋 NPC ")) return;
         e.setCancelled(true);
 
         ItemStack clicked = e.getCurrentItem();
@@ -108,31 +146,32 @@ public class NpcGUIListener implements Listener {
         String label = ChatColor.stripColor(meta.getDisplayName());
 
         switch (label) {
-            case "이전" -> {
+            case "이전 페이지" -> {
                 int pg = playerPage.getOrDefault(p.getUniqueId(), 0);
                 playerPage.put(p.getUniqueId(), Math.max(0, pg - 1));
                 openSelector(p);
             }
-            case "다음" -> {
+            case "다음 페이지" -> {
                 int pg2 = playerPage.getOrDefault(p.getUniqueId(), 0);
                 playerPage.put(p.getUniqueId(), pg2 + 1);
                 openSelector(p);
             }
-            case "✔ 변경" -> {
-                Integer sel = playerSelected.get(p.getUniqueId());
-                if (sel != null && manager.setCurrentData(sel)) {
-                    EditState st = new EditState();
-                    st.data = manager.getCurrentData();
-                    st.step = 0;
-                    editing.put(p.getUniqueId(), st);
-                    p.closeInventory();
-                    p.sendMessage(ChatColor.YELLOW + "수정할 항목 번호를 입력하세요:");
-                    String[] fields = {"name","age","gender","job","personality","background"};
-                    for (int i = 0; i < fields.length; i++) {
-                        p.sendMessage(ChatColor.GOLD + "" + (i+1) + ". " + fields[i] + " : " + getFieldValue(st.data, fields[i]));
-                    }
+            case "✔ 변경", "✔ 선택" -> {
+                UUID id = p.getUniqueId();
+                DataMode mode = playerDataMode.get(id);
+                Integer sel = playerSelected.get(id);
+                if (sel == null) {
+                    p.sendMessage(ChatColor.RED + "먼저 항목을 선택하세요.");return;
+                }
+                manager.setCurrentData(sel);
+                PromptData d = manager.getCurrentData();
+                if (mode == DataMode.CREATE) {
+                    Villager npc = playerNpcForCreate.remove(id);
+                    npc.setCustomName(d.name);
+                    p.sendMessage(ChatColor.GREEN + "NPC 생성 및 이름 설정: " + d.name);
                 } else {
-                    p.sendMessage(ChatColor.RED + "먼저 NPC를 선택하세요.");
+                    p.closeInventory();
+                    openSelector(p);
                 }
             }
             case "✘ 취소" -> p.closeInventory();

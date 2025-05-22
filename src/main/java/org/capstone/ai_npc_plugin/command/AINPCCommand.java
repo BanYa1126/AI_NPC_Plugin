@@ -22,19 +22,36 @@ public class AINPCCommand implements CommandExecutor {
     @Override
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
         if (args.length < 1) {
-            sender.sendMessage("사용법: /ainpc create | prompt_fix | remove | reset | chatlog");
+            sender.sendMessage("사용법: /ainpc prompt_set | create | prompt_fix | remove | reset | chatlog");
             return true;
         }
 
         switch (args[0].toLowerCase()) {
-            case "create":
-                if (!(sender instanceof Player player)) {
-                    sender.sendMessage(ChatColor.RED + "이 명령어는 플레이어만 사용할 수 있습니다.");
+            case "prompt_set": {
+                if (!(sender instanceof Player p)) {
+                    sender.sendMessage(ChatColor.RED + "플레이어만 사용할 수 있습니다.");
                     return true;
                 }
+                manager.openPromptSelectGUI(p);
+                p.sendMessage(ChatColor.GREEN + "프롬프트 파일 선택 GUI를 열었습니다.");
+                return true;
+            }
 
-                Location loc = player.getLocation().add(player.getLocation().getDirection().normalize().multiply(2));
-                Villager npc = player.getWorld().spawn(loc, Villager.class);
+            case "create": {
+                if (!(sender instanceof Player p)) {
+                    sender.sendMessage(ChatColor.RED + "플레이어만 사용할 수 있습니다.");
+                    return true;
+                }
+                // 2-1) 아직 prompt_set 안 했으면 안내
+                if (manager.getAllData().isEmpty()) {
+                    p.sendMessage(ChatColor.YELLOW
+                            + "먼저 /ainpc prompt_set <파일명> 으로 프롬프트를 설정하세요.");
+                    return true;
+                }
+                // 2-2) NPC 스폰
+                Location loc = p.getLocation()
+                        .add(p.getLocation().getDirection().normalize().multiply(2));
+                Villager npc = p.getWorld().spawn(loc, Villager.class);
                 npc.setCustomName("AI 주민");
                 npc.setCustomNameVisible(true);
                 npc.setAI(false);
@@ -42,27 +59,21 @@ public class AINPCCommand implements CommandExecutor {
                 npc.setPersistent(true);
                 npc.setProfession(Villager.Profession.LIBRARIAN);
 
-                plugin.getNpcManager().openPromptSelectGUI(player, npc);
-                return true;
+                // 2-3) 데이터 선택 GUI (번호별로 getAllData() 보여주고, 선택하면 그 이름으로 NPC 이름 변경)
+                manager.openDataSelectGUI(p, npc);
 
-            case "prompt_fix":
-                if (!(sender instanceof Player player)) {
-                    sender.sendMessage(ChatColor.RED + "이 명령어는 플레이어만 사용할 수 있습니다.");
+                return true;
+            }
+
+            case "prompt_fix": {
+                if (!(sender instanceof Player p)) {
+                    sender.sendMessage(ChatColor.RED + "플레이어만 사용할 수 있습니다.");
                     return true;
                 }
-
-                if (args.length < 2) {
-                    player.sendMessage(ChatColor.YELLOW + "사용법: /ainpc prompt_fix <파일명>");
-                    return true;
-                }
-                String fileName = args[1];  // JSON 파일명 (확장자 제외)
-                if (manager.loadNpcData(fileName)) {
-                    manager.openNpcEditGUI(player);
-                    player.sendMessage(ChatColor.GREEN + "NPC 편집 GUI가 열렸습니다: " + fileName + ".json");
-                } else {
-                    player.sendMessage(ChatColor.RED + "해당 파일을 찾을 수 없습니다: " + fileName + ".json");
-                }
+                manager.openPromptFixGUI(p);
+                p.sendMessage(ChatColor.GREEN + "프롬프트 파일 수정 GUI를 열었습니다.");
                 return true;
+            }
 
             case "remove":
                 AI_NPC_Plugin.globalNpc = new org.capstone.ai_npc_plugin.npc.AINPC();

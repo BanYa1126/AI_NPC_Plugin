@@ -9,6 +9,10 @@ import org.bukkit.entity.Player;
 import org.bukkit.entity.Villager;
 import org.bukkit.plugin.Plugin;
 import org.capstone.ai_npc_plugin.npc.PromptData;
+import org.capstone.ai_npc_plugin.gui.NpcFileSelector;
+import org.capstone.ai_npc_plugin.gui.NpcFileSelector.Mode;
+import org.capstone.ai_npc_plugin.gui.NpcGUIListener;
+
 
 import java.io.File;
 import java.io.IOException;
@@ -29,14 +33,9 @@ public class PromptEditorManager {
     private final NpcFileSelector fileSelector;
     private final NpcGUIListener guiListener;
     private List<PromptData> allData;
-
     private PromptData currentData;
     private File currentDataFile;
 
-    /**
-     * @param plugin     플러그인 인스턴스
-     * @param folderPath config.yml에서 읽어온 JSON 폴더 경로
-     */
     public PromptEditorManager(Plugin plugin, String folderPath) {
         this.plugin = plugin;
         File folder = new File(folderPath);
@@ -47,14 +46,31 @@ public class PromptEditorManager {
         if (!promptDataFolder.exists() && !promptDataFolder.mkdirs()) {
             plugin.getLogger().severe("프롬프트 폴더 생성 실패: " + promptDataFolder.getPath());
         }
-        this.fileSelector = new NpcFileSelector(plugin, promptDataFolder);
         this.guiListener = new NpcGUIListener(plugin, this);
+        this.fileSelector = new NpcFileSelector(
+                plugin,
+                promptDataFolder,
+                this,           // PromptEditorManager
+                guiListener     // NpcGUIListener
+        );
         Bukkit.getPluginManager().registerEvents(guiListener, plugin);
     }
 
-    /**
-     * 기본 JSON 파일 이름(npc.json 등)로 로드
-     */
+    public void openPromptSelectGUI(Player player) {
+        fileSelector.openGUI(player, null, NpcFileSelector.Mode.PROMPT_SET);
+    }
+
+    public void openDataSelectGUI(Player player, Villager npc) {
+        guiListener.openCreateSelector(player, npc);
+    }
+
+    public boolean loadPromptFile(String fileName) {
+        String base = fileName.endsWith(".json")
+                ? fileName.substring(0, fileName.length() - 5)
+                : fileName;
+        return loadNpcData(base);
+    }
+
     public boolean loadNpcData(String baseName) {
         File file = new File(promptDataFolder, baseName + ".json");
         if (!file.exists()) {
@@ -89,16 +105,10 @@ public class PromptEditorManager {
         }
     }
 
-    /**
-     * 현재 로드된 PromptData 반환
-     */
     public PromptData getCurrentData() {
         return currentData;
     }
 
-    /**
-     * JSON 파일에서 name 필드로 데이터 로드
-     */
     public boolean loadPromptDataByName(String name) {
         File[] files = promptDataFolder.listFiles((dir, f) -> f.endsWith(".json"));
         if (files == null) return false;
@@ -122,9 +132,6 @@ public class PromptEditorManager {
         return false;
     }
 
-    /**
-     * currentData를 JSON으로 덮어쓰기
-     */
     public void saveNpcData() {
         Gson gson = new GsonBuilder().setPrettyPrinting().create();
         try (OutputStreamWriter w = new OutputStreamWriter(
@@ -136,32 +143,20 @@ public class PromptEditorManager {
             plugin.getLogger().severe("NPC 데이터 저장 실패: " + ex.getMessage());
         }
     }
-
-    /**
-     * NPC 생성 시 프롬프트 선택 GUI 열기
-     */
-    public void openPromptSelectGUI(Player player, Villager npc) {
-        fileSelector.openGUI(player, npc);
+    public void openPromptFixGUI(Player player) {
+        // 두 번째 인자(npc)에는 아직 관련 정보가 없으므로 null
+        fileSelector.openGUI(player, null, NpcFileSelector.Mode.PROMPT_FIX);
     }
 
-    /**
-     * 프롬프트 편집 GUI(필드 선택) 열기
-     */
     public void openNpcEditGUI(Player player) {
-        guiListener.openSelector(player);
+        guiListener.openFixSelector(player);
     }
 
-    /**
-     * JSON 폴더 내 모든 PromptData 리스트로 반환
-     */
     public List<PromptData> getAllData() {
         if (allData == null) return Collections.emptyList();
         return allData;
     }
 
-    /**
-     * 번호로 지정된 PromptData를 currentData로 설정
-     */
     public boolean setCurrentData(int number) {
         for (PromptData d : allData) {
             if (d.number == number) {

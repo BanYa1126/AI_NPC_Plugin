@@ -5,7 +5,7 @@ api-version: '1.20'
 commands:
   ainpc:
     description: AI NPC 제어 명령어
-    usage: /ainpc <create|remove|prompt_fix|reset|chatlog>
+    usage: /ainpc <prompt_set|create|remove|prompt_fix|reset|chatlog>
     aliases: []
   model:
     description: 모델 제어 명령어
