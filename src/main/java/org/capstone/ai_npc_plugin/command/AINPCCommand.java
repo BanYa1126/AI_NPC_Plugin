@@ -7,8 +7,8 @@ import org.bukkit.entity.Player;
 import org.bukkit.entity.Villager;
 import org.capstone.ai_npc_plugin.AI_NPC_Plugin;
 import org.capstone.ai_npc_plugin.gui.PromptEditorManager;
-
-import java.util.*;
+import org.bukkit.NamespacedKey;
+import org.bukkit.persistence.PersistentDataType;
 
 public class AINPCCommand implements CommandExecutor {
 
@@ -55,6 +55,12 @@ public class AINPCCommand implements CommandExecutor {
                 npc.setInvulnerable(true);
                 npc.setPersistent(true);
                 npc.setProfession(Villager.Profession.NONE);
+
+                npc.getPersistentDataContainer().set(
+                        new NamespacedKey(plugin, "ainpc"),
+                        PersistentDataType.STRING,
+                        "true"
+                );
 
                 manager.openDataSelectGUI(p, npc);
                 return true;
