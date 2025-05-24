@@ -21,6 +21,7 @@ import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.plugin.Plugin;
 import org.capstone.ai_npc_plugin.npc.PromptData;
 import org.capstone.ai_npc_plugin.gui.NpcGUIListener;
+import org.capstone.ai_npc_plugin.gui.FileSelectorHolder;
 
 import java.io.File;
 import java.io.FileInputStream;
@@ -39,9 +40,9 @@ public class NpcFileSelector implements Listener {
     private static final int GUI_SIZE = 54;
     private static final int FILES_PER_PAGE = 45;
 
-    private final Map<UUID, Mode>    playerMode     = new HashMap<>();
     private final Map<UUID, Integer> playerScroll   = new HashMap<>();
     private final Map<UUID, String>  playerSelected = new HashMap<>();
+    private final Map<UUID, Mode>    playerMode     = new HashMap<>();
     private final Map<UUID, Villager>playerNpc      = new HashMap<>();
 
     public NpcFileSelector(Plugin plugin,
@@ -58,7 +59,12 @@ public class NpcFileSelector implements Listener {
 
     /** mode 에 따라 title 과 apply 버튼을 다르게 띄워 줍니다 */
     public void openGUI(Player player, Villager npc, Mode mode) {
-        playerMode.put(player.getUniqueId(), mode);
+        UUID id = player.getUniqueId();
+        playerMode.put(id, mode);
+        playerSelected.remove(id);
+        playerScroll.remove(id);
+
+        FileSelectorHolder holder = new FileSelectorHolder(mode);
         playerNpc.put(player.getUniqueId(), npc);
 
         List<File> files = getSortedJsonFiles();
@@ -68,7 +74,7 @@ public class NpcFileSelector implements Listener {
         String title = mode == Mode.PROMPT_SET
                 ? "📁 Prompt Set 선택"
                 : "📁 Prompt Fix 선택";
-        Inventory gui = Bukkit.createInventory(null, GUI_SIZE, title);
+        Inventory gui = Bukkit.createInventory(holder, GUI_SIZE, title);
 
         for (int i = idx; i < end; i++) {
             File f = files.get(i);
@@ -129,12 +135,10 @@ public class NpcFileSelector implements Listener {
     @EventHandler
     public void onInventoryClick(InventoryClickEvent e) {
         if (!(e.getWhoClicked() instanceof Player p)) return;
-        String title = e.getView().getTitle();
-        if (!title.startsWith("📁")) return;  // 우리가 연 GUI 만
+        if (!(e.getInventory().getHolder() instanceof FileSelectorHolder holder)) return;
         e.setCancelled(true);
-
         UUID id = p.getUniqueId();
-        Mode mode = playerMode.get(id);
+        Mode mode = holder.getMode();
         ItemStack clicked = e.getCurrentItem();
         if (clicked == null || !clicked.hasItemMeta()) return;
 
@@ -154,32 +158,37 @@ public class NpcFileSelector implements Listener {
                 openGUI(p, playerNpc.get(id), mode);
             }
             case "✘ 취소" -> p.closeInventory();
+
             case "✔ 적용", "✔ 선택" -> {
-                if (fn == null) {
+                // 1) 맵에서 꺼내기
+                String sel = playerSelected.get(id);
+                if (sel == null) {
                     p.sendMessage(ChatColor.RED + "먼저 파일을 선택하세요.");
                     return;
                 }
-                // 공통: 파일 로드
-                if (!manager.loadPromptFile(fn)) {
-                    p.sendMessage(ChatColor.RED + "파일 로드에 실패했습니다: " + fn);
+
+                // 2) 실제 파일 로드
+                if (!manager.loadPromptFile(sel)) {
+                    p.sendMessage(ChatColor.RED + "파일 로드에 실패했습니다: " + sel);
                     p.closeInventory();
                     return;
                 }
 
+                // 3) 모드별 동작
                 if (mode == Mode.PROMPT_SET) {
-                    p.sendMessage(ChatColor.GREEN + "프롬프트 파일 적용 완료: " + fn);
+                    p.sendMessage(ChatColor.GREEN + "프롬프트 파일 적용 완료: " + sel);
                     p.closeInventory();
-
                 } else {
                     p.closeInventory();
                     manager.openNpcEditGUI(p);
                 }
             }
+
             default -> {
-                // 파일 아이콘 클릭: 선택 강조만
+                // 파일 아이콘 클릭: 선택 저장 후 GUI 리프레시
                 if (fn != null) {
                     playerSelected.put(id, fn);
-                    p.sendMessage(ChatColor.GOLD + "선택됨: " + fn);
+                    p.sendMessage(ChatColor.GOLD + "[선택됨] " + fn);
                     openGUI(p, playerNpc.get(id), mode);
                 }
             }

@@ -76,7 +76,13 @@ public class NpcGUIListener implements Listener {
         int start   = page * ITEMS_PER_PAGE;
         int end     = Math.min(start + ITEMS_PER_PAGE, dataList.size());
 
-        Inventory gui = Bukkit.createInventory(null, GUI_SIZE, title);
+        DataSelectorHolder holder = new DataSelectorHolder(
+                playerDataMode.get(player.getUniqueId()) == DataMode.CREATE
+                        ? DataSelectorHolder.DataMode.CREATE
+                        : DataSelectorHolder.DataMode.FIX,
+                null
+        );
+        Inventory gui = Bukkit.createInventory(holder, GUI_SIZE, title);
         Integer selNum = playerSelected.get(player.getUniqueId());
 
         // — 기존 반복문: 아이템 세팅 그대로 —
@@ -136,10 +142,10 @@ public class NpcGUIListener implements Listener {
     @EventHandler
     public void onInventoryClick(InventoryClickEvent e) {
         if (!(e.getWhoClicked() instanceof Player p)) return;
-        String title = e.getView().getTitle();
-        if (!title.startsWith("📋 NPC ")) return;
-        e.setCancelled(true);
+        if (!(e.getInventory().getHolder() instanceof DataSelectorHolder holder)) return;
+        DataSelectorHolder.DataMode mode = holder.getMode();
 
+        e.setCancelled(true);
         ItemStack clicked = e.getCurrentItem();
         if (clicked == null || !clicked.hasItemMeta()) return;
         ItemMeta meta = clicked.getItemMeta();
@@ -158,23 +164,23 @@ public class NpcGUIListener implements Listener {
             }
             case "✔ 변경", "✔ 선택" -> {
                 UUID id = p.getUniqueId();
-                DataMode mode = playerDataMode.get(id);
+                DataSelectorHolder.DataMode dataMode = mode;
                 Integer sel = playerSelected.get(id);
                 if (sel == null) {
-                    p.sendMessage(ChatColor.RED + "먼저 항목을 선택하세요.");return;
+                    p.sendMessage(ChatColor.RED + "먼저 항목을 선택하세요.");
+                    return;
                 }
                 manager.setCurrentData(sel);
                 PromptData d = manager.getCurrentData();
-                if (mode == DataMode.CREATE) {
+                if (dataMode == DataSelectorHolder.DataMode.CREATE) {
                     Villager npc = playerNpcForCreate.remove(id);
                     npc.setCustomName(d.name);
                     p.sendMessage(ChatColor.GREEN + "NPC 생성 및 이름 설정: " + d.name);
-                } else {
+                } else
                     p.closeInventory();
-                    openSelector(p);
-                }
+                openSelector(p);
             }
-            case "✘ 취소" -> p.closeInventory();
+        case "✘ 취소" -> p.closeInventory();
             default -> {
                 Integer num = meta.getPersistentDataContainer()
                         .get(new NamespacedKey(plugin, "npc_number"), PersistentDataType.INTEGER);

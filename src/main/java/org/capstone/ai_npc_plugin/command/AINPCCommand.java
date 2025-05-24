@@ -21,34 +21,31 @@ public class AINPCCommand implements CommandExecutor {
 
     @Override
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
+        if (!(sender instanceof Player p)) {
+            sender.sendMessage(ChatColor.RED + "플레이어만 사용할 수 있습니다.");
+            return true;
+        }
+
         if (args.length < 1) {
-            sender.sendMessage("사용법: /ainpc prompt_set | create | prompt_fix | remove | reset | chatlog");
+            p.sendMessage("§e사용법: /ainpc <prompt_set|prompt_fix|create|remove|reset|chatlog>");
             return true;
         }
 
         switch (args[0].toLowerCase()) {
             case "prompt_set": {
-                if (!(sender instanceof Player p)) {
-                    sender.sendMessage(ChatColor.RED + "플레이어만 사용할 수 있습니다.");
-                    return true;
-                }
+                // GUI로만 열기
                 manager.openPromptSelectGUI(p);
                 p.sendMessage(ChatColor.GREEN + "프롬프트 파일 선택 GUI를 열었습니다.");
                 return true;
             }
 
             case "create": {
-                if (!(sender instanceof Player p)) {
-                    sender.sendMessage(ChatColor.RED + "플레이어만 사용할 수 있습니다.");
-                    return true;
-                }
-                // 2-1) 아직 prompt_set 안 했으면 안내
                 if (manager.getAllData().isEmpty()) {
                     p.sendMessage(ChatColor.YELLOW
-                            + "먼저 /ainpc prompt_set <파일명> 으로 프롬프트를 설정하세요.");
+                            + "먼저 /ainpc prompt_set 으로 프롬프트를 설정하세요.");
                     return true;
                 }
-                // 2-2) NPC 스폰
+
                 Location loc = p.getLocation()
                         .add(p.getLocation().getDirection().normalize().multiply(2));
                 Villager npc = p.getWorld().spawn(loc, Villager.class);
@@ -57,19 +54,14 @@ public class AINPCCommand implements CommandExecutor {
                 npc.setAI(false);
                 npc.setInvulnerable(true);
                 npc.setPersistent(true);
-                npc.setProfession(Villager.Profession.LIBRARIAN);
+                npc.setProfession(Villager.Profession.NONE);
 
-                // 2-3) 데이터 선택 GUI (번호별로 getAllData() 보여주고, 선택하면 그 이름으로 NPC 이름 변경)
                 manager.openDataSelectGUI(p, npc);
-
                 return true;
             }
 
             case "prompt_fix": {
-                if (!(sender instanceof Player p)) {
-                    sender.sendMessage(ChatColor.RED + "플레이어만 사용할 수 있습니다.");
-                    return true;
-                }
+                // GUI로만 열기
                 manager.openPromptFixGUI(p);
                 p.sendMessage(ChatColor.GREEN + "프롬프트 파일 수정 GUI를 열었습니다.");
                 return true;
