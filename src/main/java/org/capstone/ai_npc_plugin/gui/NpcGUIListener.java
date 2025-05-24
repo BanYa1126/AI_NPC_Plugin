@@ -164,21 +164,33 @@ public class NpcGUIListener implements Listener {
             }
             case "✔ 변경", "✔ 선택" -> {
                 UUID id = p.getUniqueId();
-                DataSelectorHolder.DataMode dataMode = mode;
+                DataSelectorHolder.DataMode dataMode = holder.getMode();
                 Integer sel = playerSelected.get(id);
                 if (sel == null) {
                     p.sendMessage(ChatColor.RED + "먼저 항목을 선택하세요.");
                     return;
                 }
+
                 manager.setCurrentData(sel);
                 PromptData d = manager.getCurrentData();
+
                 if (dataMode == DataSelectorHolder.DataMode.CREATE) {
                     Villager npc = playerNpcForCreate.remove(id);
                     npc.setCustomName(d.name);
                     p.sendMessage(ChatColor.GREEN + "NPC 생성 및 이름 설정: " + d.name);
-                } else
                     p.closeInventory();
-                openSelector(p);
+
+                } else {
+                    p.closeInventory();
+
+                    EditState st = new EditState();
+                    st.data = d;
+                    st.step = 0;            // 0: 필드 선택 대기
+                    editing.put(id, st);
+
+                    p.sendMessage(ChatColor.YELLOW
+                            + "수정할 항목 번호(1~6)를 채팅으로 입력하세요.");
+                }
             }
         case "✘ 취소" -> p.closeInventory();
             default -> {
