@@ -175,18 +175,24 @@ public class NpcGUIListener implements Listener {
                 PromptData d = manager.getCurrentData();
 
                 if (dataMode == DataSelectorHolder.DataMode.CREATE) {
-                    Villager npc = playerNpcForCreate.remove(id);
-                    npc.setCustomName(d.name);
-                    p.sendMessage(ChatColor.GREEN + "NPC 생성 및 이름 설정: " + d.name);
-                    p.closeInventory();
-
                 } else {
+                    // 1) GUI 닫고 수정 상태 세팅
                     p.closeInventory();
-
                     EditState st = new EditState();
                     st.data = d;
-                    st.step = 0;            // 0: 필드 선택 대기
+                    st.step = 0;  // 0: 번호 입력 대기
                     editing.put(id, st);
+
+                    p.sendMessage(ChatColor.YELLOW + "수정 가능할 항목 데이터");
+                    for (int i = 1; i <= 6; i++) {
+                        String fname = getFieldName(i);
+                        String fval   = getFieldValue(d, fname);
+                        p.sendMessage(
+                                " " + i
+                                        + ") " + ChatColor.AQUA + fname
+                                        + ChatColor.GOLD + " : " + fval
+                        );
+                    }
 
                     p.sendMessage(ChatColor.YELLOW
                             + "수정할 항목 번호(1~6)를 채팅으로 입력하세요.");
