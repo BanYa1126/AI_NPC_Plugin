@@ -2,6 +2,7 @@ package org.capstone.ai_npc_plugin;
 
 import org.bukkit.plugin.java.JavaPlugin;
 import org.capstone.ai_npc_plugin.command.AINPCCommand;
+import org.capstone.ai_npc_plugin.command.AINPCTabCompleter;
 import org.capstone.ai_npc_plugin.command.ModelCommand;
 import org.capstone.ai_npc_plugin.gui.NpcFileSelector;
 import org.capstone.ai_npc_plugin.listener.ChatListener;
@@ -25,6 +26,7 @@ public final class AI_NPC_Plugin extends JavaPlugin {
         // 3) 나머지 명령어 & 리스너 등록
         getCommand("model").setExecutor(new ModelCommand(this));
         getCommand("ainpc").setExecutor(new AINPCCommand(this, promptEditorManager));
+        getCommand("ainpc").setTabCompleter(new AINPCTabCompleter());
         getServer().getPluginManager().registerEvents(new ChatListener(), this);
 
         getLogger().info("AI_NPC_Plugin 활성화됨");

@@ -10,6 +10,7 @@ import org.bukkit.event.player.PlayerInteractEntityEvent;
 import org.bukkit.NamespacedKey;
 import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.plugin.Plugin;
+import org.bukkit.Bukkit;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -44,12 +45,16 @@ public class NpcInteractListener implements Listener {
 
         if (!(entity instanceof Villager villager)) return;
 
+        Bukkit.getLogger().info("[AINPC DEBUG] Villager 우클릭 감지됨");
+
         NamespacedKey key = new NamespacedKey(plugin, "ainpc");
 
         if (villager.getPersistentDataContainer().has(key, PersistentDataType.STRING)) {
             event.setCancelled(true); // ✅ 거래창 차단
             setInteraction(player, villager);
             player.sendMessage(ChatColor.YELLOW + "💬 이제 이 NPC와 대화합니다.");
+        } else {
+            Bukkit.getLogger().info("[AINPC DEBUG] 해당 Villager는 AI NPC 아님");
+            }
         }
     }
-}
