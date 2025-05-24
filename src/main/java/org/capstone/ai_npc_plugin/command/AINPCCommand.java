@@ -27,7 +27,7 @@ public class AINPCCommand implements CommandExecutor {
         }
 
         if (args.length < 1) {
-            p.sendMessage("§e사용법: /ainpc <prompt_set|prompt_fix|create|remove|reset|chatlog>");
+            p.sendMessage("§e사용법: /ainpc <prompt_set|prompt_fix|create|remove|reset|chatlog|disengage>");
             return true;
         }
 
@@ -80,6 +80,12 @@ public class AINPCCommand implements CommandExecutor {
             case "chatlog":
                 sender.sendMessage("대화 로그:\n" + AI_NPC_Plugin.globalNpc.getChatLog());
                 return true;
+
+            case "disengage": {
+                org.capstone.ai_npc_plugin.listener.NpcInteractListener.clearInteraction(p);
+                p.sendMessage(ChatColor.GRAY + "NPC와의 대화 연결이 해제되었습니다.");
+                return true;
+            }
 
             default:
                 sender.sendMessage("알 수 없는 명령어입니다.");
