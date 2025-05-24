@@ -40,9 +40,9 @@ public class NpcFileSelector implements Listener {
     private static final int GUI_SIZE = 54;
     private static final int FILES_PER_PAGE = 45;
 
+    private final Map<UUID,String> selectedForSet = new HashMap<>();
+    private final Map<UUID,String> selectedForFix = new HashMap<>();
     private final Map<UUID, Integer> playerScroll   = new HashMap<>();
-    private final Map<UUID, String>  playerSelected = new HashMap<>();
-    private final Map<UUID, Mode>    playerMode     = new HashMap<>();
     private final Map<UUID, Villager>playerNpc      = new HashMap<>();
 
     public NpcFileSelector(Plugin plugin,
@@ -60,21 +60,24 @@ public class NpcFileSelector implements Listener {
     /** mode 에 따라 title 과 apply 버튼을 다르게 띄워 줍니다 */
     public void openGUI(Player player, Villager npc, Mode mode) {
         UUID id = player.getUniqueId();
-        playerMode.put(id, mode);
-        playerSelected.remove(id);
         playerScroll.remove(id);
+        playerNpc.put(id, npc);
 
         FileSelectorHolder holder = new FileSelectorHolder(mode);
-        playerNpc.put(player.getUniqueId(), npc);
 
         List<File> files = getSortedJsonFiles();
-        int idx = playerScroll.getOrDefault(player.getUniqueId(), 0);
+        int idx = playerScroll.getOrDefault(id, 0);
         int end = Math.min(idx + FILES_PER_PAGE, files.size());
 
-        String title = mode == Mode.PROMPT_SET
-                ? "📁 Prompt Set 선택"
-                : "📁 Prompt Fix 선택";
+        String title = (mode == Mode.PROMPT_SET
+                ? "📁 Prompt Set 선택" : "📁 Prompt Fix 선택"
+        );
         Inventory gui = Bukkit.createInventory(holder, GUI_SIZE, title);
+
+        String already = (mode == Mode.PROMPT_SET
+                ? selectedForSet.get(id)
+                : selectedForFix.get(id)
+        );
 
         for (int i = idx; i < end; i++) {
             File f = files.get(i);
@@ -103,14 +106,14 @@ public class NpcFileSelector implements Listener {
 
             ItemStack it = new ItemStack(Material.PAPER);
             ItemMeta m = it.getItemMeta();
-            boolean selected = f.getName().equals(playerSelected.get(player.getUniqueId()));
+            boolean isSel = f.getName().equals(already);
 
             m.setDisplayName(
-                    selected
+                    isSel
                             ? ChatColor.YELLOW + "✔ " + f.getName()
-                            : ChatColor.WHITE + f.getName()
+                            : ChatColor.WHITE  + f.getName()
             );
-            m.setLore(Collections.singletonList(ChatColor.GRAY + jsonName));
+            m.setLore(Collections.singletonList(ChatColor.GRAY + parseJsonNames(f)));
             m.getPersistentDataContainer()
                     .set(new NamespacedKey(plugin, "filename"),
                             PersistentDataType.STRING,
@@ -137,11 +140,12 @@ public class NpcFileSelector implements Listener {
         if (!(e.getWhoClicked() instanceof Player p)) return;
         if (!(e.getInventory().getHolder() instanceof FileSelectorHolder holder)) return;
         e.setCancelled(true);
+
         UUID id = p.getUniqueId();
         Mode mode = holder.getMode();
+
         ItemStack clicked = e.getCurrentItem();
         if (clicked == null || !clicked.hasItemMeta()) return;
-
         String label = ChatColor.stripColor(clicked.getItemMeta().getDisplayName());
         String fn    = clicked.getItemMeta()
                 .getPersistentDataContainer()
@@ -160,21 +164,21 @@ public class NpcFileSelector implements Listener {
             case "✘ 취소" -> p.closeInventory();
 
             case "✔ 적용", "✔ 선택" -> {
-                // 1) 맵에서 꺼내기
-                String sel = playerSelected.get(id);
+                // (C) 모드별 맵에서 꺼내 적용
+                String sel = (mode == Mode.PROMPT_SET
+                        ? selectedForSet.get(id)
+                        : selectedForFix.get(id)
+                );
                 if (sel == null) {
                     p.sendMessage(ChatColor.RED + "먼저 파일을 선택하세요.");
                     return;
                 }
 
-                // 2) 실제 파일 로드
                 if (!manager.loadPromptFile(sel)) {
                     p.sendMessage(ChatColor.RED + "파일 로드에 실패했습니다: " + sel);
                     p.closeInventory();
                     return;
                 }
-
-                // 3) 모드별 동작
                 if (mode == Mode.PROMPT_SET) {
                     p.sendMessage(ChatColor.GREEN + "프롬프트 파일 적용 완료: " + sel);
                     p.closeInventory();
@@ -185,9 +189,13 @@ public class NpcFileSelector implements Listener {
             }
 
             default -> {
-                // 파일 아이콘 클릭: 선택 저장 후 GUI 리프레시
+                // (D) 파일 클릭 시 모드별로 선택 저장 후 리프레시
                 if (fn != null) {
-                    playerSelected.put(id, fn);
+                    if (mode == Mode.PROMPT_SET) {
+                        selectedForSet.put(id, fn);
+                    } else {
+                        selectedForFix.put(id, fn);
+                    }
                     p.sendMessage(ChatColor.GOLD + "[선택됨] " + fn);
                     openGUI(p, playerNpc.get(id), mode);
                 }
