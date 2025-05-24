@@ -230,10 +230,11 @@ public class NpcGUIListener implements Listener {
     @EventHandler
     public void onChat(AsyncPlayerChatEvent e) {
         Player p = e.getPlayer();
-        if (!editing.containsKey(p.getUniqueId())) return;
+        UUID id = p.getUniqueId();
+        if (!editing.containsKey(id)) return;
         e.setCancelled(true);
 
-        EditState st = editing.get(p.getUniqueId());
+        EditState st = editing.get(id);
         String msg = e.getMessage().trim();
 
         if (st.step == 0) {
@@ -242,6 +243,15 @@ public class NpcGUIListener implements Listener {
                 if (idx >= 1 && idx <= 6) {
                     st.selectedField = idx;
                     st.step = 1;
+                    String fieldName = getFieldName(idx);
+                    String fieldVal  = getFieldValue(st.data, fieldName);
+
+                    p.sendMessage(
+                            ChatColor.GREEN.toString() + idx + "번 "
+                                    + ChatColor.AQUA + fieldName
+                                    + ChatColor.GOLD + " : " + fieldVal
+                                    + ChatColor.GREEN + " 항목이 선택되었습니다."
+                    );
                     p.sendMessage(ChatColor.YELLOW + "새 값을 입력하세요:");
                 } else {
                     p.sendMessage(ChatColor.RED + "1~6 사이의 숫자를 입력하세요.");
