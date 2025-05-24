@@ -9,9 +9,6 @@ import org.bukkit.entity.Player;
 import org.bukkit.entity.Villager;
 import org.bukkit.plugin.Plugin;
 import org.capstone.ai_npc_plugin.npc.PromptData;
-import org.capstone.ai_npc_plugin.gui.NpcFileSelector;
-import org.capstone.ai_npc_plugin.gui.NpcFileSelector.Mode;
-import org.capstone.ai_npc_plugin.gui.NpcGUIListener;
 
 
 import java.io.File;

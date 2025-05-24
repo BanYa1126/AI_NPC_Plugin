@@ -15,12 +15,25 @@ import org.bukkit.Bukkit;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
+import java.util.Set;
+import java.util.HashSet;
 
 public class NpcInteractListener implements Listener {
 
     private final Plugin plugin;
+
+    private static final Set<UUID> npcChatMode = new HashSet<>();
+
     // 상호작용 상태 저장 (Player UUID → Villager UUID)
     private static final Map<UUID, UUID> interactingMap = new HashMap<>();
+
+    public static void setChatMode(Player player, boolean enabled) {
+        if (enabled) {
+            npcChatMode.add(player.getUniqueId());
+        } else {
+            npcChatMode.remove(player.getUniqueId());
+        }
+    }
 
     public NpcInteractListener(Plugin plugin) {
         this.plugin = plugin;
@@ -36,6 +49,10 @@ public class NpcInteractListener implements Listener {
 
     public static void setInteraction(Player player, Villager villager) {
         interactingMap.put(player.getUniqueId(), villager.getUniqueId());
+    }
+
+    public static boolean isChatMode(Player player) {
+        return npcChatMode.contains(player.getUniqueId());
     }
 
     @EventHandler

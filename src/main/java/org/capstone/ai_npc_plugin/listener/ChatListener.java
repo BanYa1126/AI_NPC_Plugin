@@ -33,6 +33,10 @@ public class ChatListener implements Listener {
         Player player = event.getPlayer();
         String message = event.getMessage();
 
+        if (!NpcInteractListener.isChatMode(player)) {
+            return; // 일반 모드에서는 무시
+        }
+
         // ✅ 모든 로직을 메인 스레드에서 실행
         Bukkit.getScheduler().runTask(
                 Bukkit.getPluginManager().getPlugin("AI_NPC_Plugin"),

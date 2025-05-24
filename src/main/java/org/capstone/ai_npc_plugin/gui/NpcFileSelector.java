@@ -19,9 +19,6 @@ import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.plugin.Plugin;
-import org.capstone.ai_npc_plugin.npc.PromptData;
-import org.capstone.ai_npc_plugin.gui.NpcGUIListener;
-import org.capstone.ai_npc_plugin.gui.FileSelectorHolder;
 
 import java.io.File;
 import java.io.FileInputStream;

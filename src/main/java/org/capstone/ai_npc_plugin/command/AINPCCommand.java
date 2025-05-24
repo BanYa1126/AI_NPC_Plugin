@@ -9,6 +9,7 @@ import org.capstone.ai_npc_plugin.AI_NPC_Plugin;
 import org.capstone.ai_npc_plugin.gui.PromptEditorManager;
 import org.bukkit.NamespacedKey;
 import org.bukkit.persistence.PersistentDataType;
+import org.capstone.ai_npc_plugin.listener.NpcInteractListener;
 
 public class AINPCCommand implements CommandExecutor {
 
@@ -87,11 +88,26 @@ public class AINPCCommand implements CommandExecutor {
                 sender.sendMessage("대화 로그:\n" + AI_NPC_Plugin.globalNpc.getChatLog());
                 return true;
 
-            case "disengage": {
-                org.capstone.ai_npc_plugin.listener.NpcInteractListener.clearInteraction(p);
-                p.sendMessage(ChatColor.GRAY + "NPC와의 대화 연결이 해제되었습니다.");
+            case "engage": {
+                if (sender instanceof Player player) {
+                    NpcInteractListener.setChatMode(player, true);
+                    player.sendMessage("§e[NPC] 대화 모드가 활성화되었습니다.");
+                } else {
+                    sender.sendMessage("플레이어만 사용할 수 있습니다.");
+                }
                 return true;
             }
+
+            case "disengage": {
+                if (sender instanceof Player player) {
+                    NpcInteractListener.setChatMode(player, false);
+                    player.sendMessage("§e[NPC] 대화 모드가 비활성화되었습니다.");
+                } else {
+                    sender.sendMessage("플레이어만 사용할 수 있습니다.");
+                }
+                return true;
+            }
+
 
             default:
                 sender.sendMessage("알 수 없는 명령어입니다.");

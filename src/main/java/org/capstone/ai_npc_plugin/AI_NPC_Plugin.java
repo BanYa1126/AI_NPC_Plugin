@@ -4,10 +4,9 @@ import org.bukkit.plugin.java.JavaPlugin;
 import org.capstone.ai_npc_plugin.command.AINPCCommand;
 import org.capstone.ai_npc_plugin.command.AINPCTabCompleter;
 import org.capstone.ai_npc_plugin.command.ModelCommand;
-import org.capstone.ai_npc_plugin.gui.NpcFileSelector;
 import org.capstone.ai_npc_plugin.listener.ChatListener;
-import org.capstone.ai_npc_plugin.gui.NpcGUIListener;
 import org.capstone.ai_npc_plugin.gui.PromptEditorManager;
+import org.capstone.ai_npc_plugin.listener.NpcInteractListener;
 import org.capstone.ai_npc_plugin.npc.AINPC;
 
 public final class AI_NPC_Plugin extends JavaPlugin {
@@ -28,6 +27,7 @@ public final class AI_NPC_Plugin extends JavaPlugin {
         getCommand("ainpc").setExecutor(new AINPCCommand(this, promptEditorManager));
         getCommand("ainpc").setTabCompleter(new AINPCTabCompleter());
         getServer().getPluginManager().registerEvents(new ChatListener(), this);
+        getServer().getPluginManager().registerEvents(new NpcInteractListener(this), this);
 
         getLogger().info("AI_NPC_Plugin 활성화됨");
     }

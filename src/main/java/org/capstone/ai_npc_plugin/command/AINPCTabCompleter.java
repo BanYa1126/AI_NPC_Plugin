@@ -10,7 +10,7 @@ import java.util.List;
 public class AINPCTabCompleter implements TabCompleter {
 
     private static final List<String> SUB_COMMANDS = Arrays.asList(
-            "prompt_set", "prompt_fix", "create", "remove", "reset", "chatlog", "disengage"
+            "prompt_set", "prompt_fix", "create", "remove", "reset", "chatlog","engage", "disengage"
     );
 
     @Override
