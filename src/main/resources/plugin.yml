@@ -2,11 +2,12 @@ name: AI_NPC_Plugin
 version: '1.0-SNAPSHOT'
 main: org.capstone.ai_npc_plugin.AI_NPC_Plugin
 api-version: '1.20'
+
 commands:
   ainpc:
     description: AI NPC 제어 명령어
-    usage: /ainpc <prompt_set|create|remove|prompt_fix|reset|chatlog|engage|disengage>
-    aliases: []
+    usage: /ainpc <prompt_set|prompt_fix|create|remove|reset|chatlog|chatmode on|chatmode off|disengage>
+    aliases: [npc]
   model:
     description: 모델 제어 명령어
     usage: /model <on|off|reload|status>

@@ -88,26 +88,40 @@ public class AINPCCommand implements CommandExecutor {
                 sender.sendMessage("대화 로그:\n" + AI_NPC_Plugin.globalNpc.getChatLog());
                 return true;
 
-            case "engage": {
-                if (sender instanceof Player player) {
-                    NpcInteractListener.setChatMode(player, true);
-                    player.sendMessage("§e[NPC] 대화 모드가 활성화되었습니다.");
-                } else {
+            case "chatmode": {
+                if (!(sender instanceof Player player)) {
                     sender.sendMessage("플레이어만 사용할 수 있습니다.");
+                    return true;
+                }
+
+                if (args.length < 2) {
+                    player.sendMessage("§e사용법: /ainpc chatmode <on|off>");
+                    return true;
+                }
+
+                switch (args[1].toLowerCase()) {
+                    case "on" -> {
+                        NpcInteractListener.setChatMode(player, true);
+                        player.sendMessage("§a[NPC] 대화 모드가 활성화되었습니다.");
+                    }
+                    case "off" -> {
+                        NpcInteractListener.setChatMode(player, false);
+                        player.sendMessage("§c[NPC] 대화 모드가 비활성화되었습니다.");
+                    }
+                    default -> {
+                        player.sendMessage("§e사용법: /ainpc chatmode <on|off>");
+                    }
                 }
                 return true;
             }
 
             case "disengage": {
                 if (sender instanceof Player player) {
-                    NpcInteractListener.setChatMode(player, false);
-                    player.sendMessage("§e[NPC] 대화 모드가 비활성화되었습니다.");
-                } else {
-                    sender.sendMessage("플레이어만 사용할 수 있습니다.");
+                    NpcInteractListener.clearInteraction(player);
+                    player.sendMessage("§7NPC 상호작용 상태가 해제되었습니다.");
                 }
                 return true;
             }
-
 
             default:
                 sender.sendMessage("알 수 없는 명령어입니다.");

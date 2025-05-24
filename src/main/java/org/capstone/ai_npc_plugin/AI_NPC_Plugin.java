@@ -4,6 +4,7 @@ import org.bukkit.plugin.java.JavaPlugin;
 import org.capstone.ai_npc_plugin.command.AINPCCommand;
 import org.capstone.ai_npc_plugin.command.AINPCTabCompleter;
 import org.capstone.ai_npc_plugin.command.ModelCommand;
+import org.capstone.ai_npc_plugin.command.ModelTabCompleter;
 import org.capstone.ai_npc_plugin.listener.ChatListener;
 import org.capstone.ai_npc_plugin.gui.PromptEditorManager;
 import org.capstone.ai_npc_plugin.listener.NpcInteractListener;
@@ -26,6 +27,7 @@ public final class AI_NPC_Plugin extends JavaPlugin {
         getCommand("model").setExecutor(new ModelCommand(this));
         getCommand("ainpc").setExecutor(new AINPCCommand(this, promptEditorManager));
         getCommand("ainpc").setTabCompleter(new AINPCTabCompleter());
+        getCommand("model").setTabCompleter(new ModelTabCompleter());
         getServer().getPluginManager().registerEvents(new ChatListener(), this);
         getServer().getPluginManager().registerEvents(new NpcInteractListener(this), this);
 
