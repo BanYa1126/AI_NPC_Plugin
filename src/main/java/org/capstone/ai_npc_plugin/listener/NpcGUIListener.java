@@ -118,11 +118,16 @@ public class NpcGUIListener implements Listener {
             }
             meta.setLore(lore);
 
-            meta.getPersistentDataContainer().set(
-                    new NamespacedKey(plugin, "npc_code"),
-                    PersistentDataType.STRING,
-                    data.code
-            );
+            if (data.code != null) {
+                meta.getPersistentDataContainer().set(
+                        new NamespacedKey(plugin, "npc_code"),
+                        PersistentDataType.STRING,
+                        data.code
+                );
+            } else {
+                plugin.getLogger().warning("Skipping null code for PromptData at index " + i);
+            }
+
             item.setItemMeta(meta);
 
             int slot = i - start;
