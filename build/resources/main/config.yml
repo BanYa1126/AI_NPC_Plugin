@@ -1,1 +1,6 @@
+# AI_NPC_Plugin 설정 파일
+
+# 프롬프트 데이터가 저장될 폴더명
+# - 플러그인 data 폴더 내에 해당 이름으로 폴더가 생성됨 (ex: plugins/AI_NPC_Plugin/promptData)
+# - PromptEditorManager 가 이 경로를 사용하여 프롬프트 JSON 파일을 로드 / 저장
 promptDataFolder: "promptData"

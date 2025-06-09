@@ -1,4 +1,4 @@
-package org.capstone.ai_npc_plugin.gui;
+package org.capstone.ai_npc_plugin.listener;
 
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
@@ -16,60 +16,90 @@ import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.plugin.Plugin;
+import org.capstone.ai_npc_plugin.gui.DataSelectorHolder;
+import org.capstone.ai_npc_plugin.manager.PromptEditorManager;
 import org.capstone.ai_npc_plugin.npc.PromptData;
 
 import java.util.*;
 
+/**
+ * NpcGUIListener
+ *
+ * NPC 데이터 선택 및 수정 GUI 를 구성/처리하는 Listener 클래스
+ *
+ * 주요 기능:
+ * - CREATE 모드: NPC 생성 시 PromptData 선택
+ * - FIX 모드: NPC 수정 시 PromptData 선택 후 필드 수정 (채팅 입력 기반)
+ *
+ * 기능 설명:
+ * - 페이지네이션 지원
+ * - 필드별 수정 가능 (name, age, gender, job, personality, background)
+ * - AsyncPlayerChatEvent 를 이용한 텍스트 입력 기반 수정
+ *
+ * 이벤트 처리:
+ * - InventoryClickEvent
+ * - InventoryDragEvent
+ * - AsyncPlayerChatEvent
+ */
+
 public class NpcGUIListener implements Listener {
+    // 현재 플레이어별 GUI 모드 (CREATE / FIX)
     private enum DataMode { CREATE, FIX }
-    private final Map<UUID,DataMode> playerDataMode = new HashMap<>();
+    private final Map<UUID, DataMode> playerDataMode = new HashMap<>();
+    // CREATE 모드 시, 플레이어가 선택한 NPC 객체 저장 (Villager)
     private final Map<UUID, Villager> playerNpcForCreate = new HashMap<>();
+    // 플러그인 인스턴스
     private final Plugin plugin;
+    // PromptEditorManager 참조
     private final PromptEditorManager manager;
+    // GUI 설정 값
     private static final int GUI_SIZE = 54;
     private static final int ITEMS_PER_PAGE = 45;
-
+    // 플레이어별 현재 페이지
     private final Map<UUID, Integer> playerPage = new HashMap<>();
+    // 플레이어별 현재 선택된 데이터 번호
     private final Map<UUID, Integer> playerSelected = new HashMap<>();
-
+    // 수정 모드에서 사용되는 플레이어별 편집 상태
     private static class EditState {
-        PromptData data;
-        int step;          // 0 = 필드선택, 1 = 새값입력
-        int selectedField;
+        PromptData data; // 현재 수정 중인 데이터
+        int step;       // 단계 (0: 필드 선택, 1: 새 값 입력)
+        int selectedField; // 선택한 필드 인덱스
     }
     private final Map<UUID, EditState> editing = new HashMap<>();
 
+    // 생성자
     public NpcGUIListener(Plugin plugin, PromptEditorManager manager) {
         this.plugin = plugin;
         this.manager = manager;
     }
 
+    // FIX 모드: 기존 데이터 수정용 GUI 열기
     public void openFixSelector(Player player) {
         playerDataMode.put(player.getUniqueId(), DataMode.FIX);
         showDataGui(player, "📋 NPC 수정용 데이터 선택");
     }
 
-    // 3) openCreateSelector: create 명령어에서 호출
+    // CREATE 모드: NPC 생성 시 데이터 선택 GUI 열기
     public void openCreateSelector(Player player, Villager npc) {
         playerDataMode.put(player.getUniqueId(), DataMode.CREATE);
         playerNpcForCreate.put(player.getUniqueId(), npc);
         showDataGui(player, "📋 NPC 생성용 데이터 선택");
     }
 
+    // 내부 헬퍼: 현재 모드에 따라 GUI 다시 열기
     private void openSelector(Player player) {
         UUID id = player.getUniqueId();
         DataMode mode = playerDataMode.get(id);
+
         if (mode == DataMode.CREATE) {
-            // create 모드 → Villager 객체도 꺼내서 전달
             Villager npc = playerNpcForCreate.get(id);
             openCreateSelector(player, npc);
         } else {
-            // fix 모드 → 단순히 수정용 선택 GUI
             openFixSelector(player);
         }
     }
 
-    // 4) 공통 GUI 표시 헬퍼 (이 안에 기존 openSelector 코드를 통째로 이동)
+    // 공통 GUI 표시 헬퍼 (이 안에 기존 openSelector 코드를 통째로 이동)
     private void showDataGui(Player player, String title) {
         List<PromptData> dataList = manager.getAllData();
         int page    = playerPage.getOrDefault(player.getUniqueId(), 0);
@@ -139,6 +169,7 @@ public class NpcGUIListener implements Listener {
         player.openInventory(gui);
     }
 
+    // GUI 클릭 이벤트 처리
     @EventHandler
     public void onInventoryClick(InventoryClickEvent e) {
         if (!(e.getWhoClicked() instanceof Player p)) return;
@@ -181,7 +212,7 @@ public class NpcGUIListener implements Listener {
                     p.sendMessage(ChatColor.GREEN + "NPC 생성 및 이름 설정: " + d.name);
                     p.closeInventory();
 
-                } else {
+                } else { // 수정 모드 진입
                     p.closeInventory();
 
                     EditState st = new EditState();
@@ -220,6 +251,7 @@ public class NpcGUIListener implements Listener {
         }
     }
 
+    // GUI에서 드래그 방지
     @EventHandler
     public void onInventoryDrag(InventoryDragEvent e) {
         if (e.getView().getTitle().equals("📋 NPC 선택")) {
@@ -227,6 +259,7 @@ public class NpcGUIListener implements Listener {
         }
     }
 
+    // 수정 단계: 채팅 입력 처리
     @EventHandler
     public void onChat(AsyncPlayerChatEvent e) {
         Player p = e.getPlayer();
@@ -259,7 +292,7 @@ public class NpcGUIListener implements Listener {
             } catch (NumberFormatException ex) {
                 p.sendMessage(ChatColor.RED + "숫자를 입력해주세요.");
             }
-        } else {
+        } else { // 값 입력 후 저장
             PromptData d = st.data;
             String val = msg;
             switch (st.selectedField) {

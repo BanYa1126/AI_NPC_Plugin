@@ -1,14 +1,31 @@
-name: AI_NPC_Plugin
-version: '1.0-SNAPSHOT'
-main: org.capstone.ai_npc_plugin.AI_NPC_Plugin
+# 플러그인 메타 정보
+name: AI_NPC_Plugin              # 플러그인 이름 (서버에 출력됨, /plugins 시 확인 가능)
+version: '1.0-SNAPSHOT'          # 버전 (버전 관리용)
+main: org.capstone.ai_npc_plugin.AI_NPC_Plugin   # 메인 클래스 (JavaPlugin 상속 클래스 FQN)
+
+# 적용하는 Spigot / Bukkit API 버전 (1.20 버전 서버용)
 api-version: '1.20'
 
+# ----------------------------
+# 등록된 커맨드 목록
+# ----------------------------
+
 commands:
+
+  # /ainpc 명령어 정의
   ainpc:
-    description: AI NPC 제어 명령어
-    usage: /ainpc <prompt_set|prompt_fix|create|remove|reset|chatlog|chatmode on|chatmode off|disengage>
-    aliases: [npc]
+    description: AI NPC 제어 명령어          # 명령어 설명 (명령어 목록에 출력)
+    usage: /ainpc <prompt_set|prompt_fix|create|remove|reset|chatlog|chatmode on|chatmode off|disengage>  # 사용법 안내
+    aliases: [npc]                           # 별칭 (ex: /npc 로도 사용 가능)
+
+  # /ainpc_action 명령어 정의
+  ainpc_action:
+    description: AI NPC 행동 요청            # 행동 명령어 (따라오기, 대기, 전투 지원)
+    usage: /ainpc_action <follow|wait|assist>
+    aliases: []                              # 별칭 없음
+
+  # /model 명령어 정의
   model:
-    description: 모델 제어 명령어
+    description: 모델 제어 명령어             # 모델 서버 ON/OFF/상태 확인
     usage: /model <on|off|reload|status>
-    aliases: []
+    aliases: []                              # 별칭 없음
