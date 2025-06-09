@@ -156,7 +156,7 @@ public class NpcFileSelector implements Listener {
             );
 
             // Lore 설정 (JSON 내부 name 정보 표시)
-            m.setLore(Collections.singletonList(ChatColor.GRAY + parseJsonNames(f)));
+            m.setLore(parseJsonDetails(f));
 
             // filename 태그 저장
             m.getPersistentDataContainer()
@@ -265,25 +265,26 @@ public class NpcFileSelector implements Listener {
     }
 
     // JSON 파일에서 name 필드 추출
-    private String parseJsonNames(File f) {
+    private List<String> parseJsonDetails(File f) {
+        List<String> lore = new ArrayList<>();
         try (InputStreamReader r = new InputStreamReader(new FileInputStream(f), StandardCharsets.UTF_8)) {
             JsonElement root = JsonParser.parseReader(r);
             if (root.isJsonObject()) {
                 JsonObject obj = root.getAsJsonObject();
-                return obj.has("name") ? obj.get("name").getAsString() : "";
+
+                lore.add(ChatColor.GRAY + "Name: " + (obj.has("name") ? obj.get("name").getAsString() : ""));
+                lore.add(ChatColor.GRAY + "Relation: " + (obj.has("relation") ? obj.get("relation").getAsString() : ""));
+                lore.add(ChatColor.GRAY + "City: " + (obj.has("city") ? obj.get("city").getAsString() : ""));
+                lore.add(ChatColor.GRAY + "Description: " + (obj.has("description") ? obj.get("description").getAsString() : ""));
             } else if (root.isJsonArray()) {
-                List<String> names = new ArrayList<>();
-                for (JsonElement el : root.getAsJsonArray()) {
-                    if (el.isJsonObject()) {
-                        JsonObject o = el.getAsJsonObject();
-                        if (o.has("name")) names.add(o.get("name").getAsString());
-                    }
-                }
-                return String.join(", ", names);
+                lore.add(ChatColor.RED + "[지원되지 않는 배열 형식]");
             }
-        } catch (IOException ignored) {}
-        return "";
+        } catch (IOException e) {
+            lore.add(ChatColor.RED + "[파싱 실패]");
+        }
+        return lore;
     }
+
 
     // GUI 버튼 생성 헬퍼
     private ItemStack control(Material mat, String name) {

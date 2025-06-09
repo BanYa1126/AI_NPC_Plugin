@@ -162,7 +162,7 @@ public class PromptEditorManager {
     }
 
     // 이름으로 프롬프트 데이터 로드 (플러그인 내부에서 /model reload 등에 사용)
-    public boolean loadPromptDataByName(String name) {
+    public boolean loadPromptDataByCode(String code) {
         File[] files = promptDataFolder.listFiles((dir, f) -> f.endsWith(".json"));
         if (files == null) return false;
 
@@ -173,13 +173,29 @@ public class PromptEditorManager {
                     new FileInputStream(f),
                     StandardCharsets.UTF_8
             )) {
-                PromptData d = gson.fromJson(reader, PromptData.class);
+                JsonElement je = JsonParser.parseReader(reader);
+                List<PromptData> fileData;
 
-                if (d != null && name.equals(d.name)) {
-                    this.currentData = d;
-                    this.currentDataFile = f;
-                    return true;
+                if (je.isJsonArray()) {
+                    Type listType = new TypeToken<List<PromptData>>() {}.getType();
+                    fileData = gson.fromJson(je, listType);
+                } else if (je.isJsonObject()) {
+                    PromptData single = gson.fromJson(je, PromptData.class);
+                    fileData = new ArrayList<>();
+                    fileData.add(single);
+                } else {
+                    continue;
                 }
+
+                for (PromptData d : fileData) {
+                    if (d.code != null && d.code.equals(code)) {
+                        this.allData = fileData;
+                        this.currentData = d;
+                        this.currentDataFile = f;
+                        return true;
+                    }
+                }
+
             } catch (IOException ex) {
                 plugin.getLogger().severe("PromptData 로드 실패: " + f.getName());
             }
@@ -222,9 +238,9 @@ public class PromptEditorManager {
     }
 
     // 현재 데이터 중 특정 number 값과 일치하는 데이터 선택
-    public boolean setCurrentData(int number) {
+    public boolean setCurrentDataByCode(String code) {
         for (PromptData d : allData) {
-            if (d.number == number) {
+            if (d.code != null && d.code.equals(code)) {
                 currentData = d;
                 return true;
             }
