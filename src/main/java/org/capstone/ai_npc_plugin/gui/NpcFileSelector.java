@@ -193,6 +193,11 @@ public class NpcFileSelector implements Listener {
         UUID id = p.getUniqueId();
         Mode mode = holder.getMode();
 
+        String sel = (mode == Mode.PROMPT_SET
+                ? selectedForSet.get(id)
+                : selectedForFix.get(id)
+        );
+
         ItemStack clicked = e.getCurrentItem();
         if (clicked == null || !clicked.hasItemMeta()) return;
         String label = ChatColor.stripColor(clicked.getItemMeta().getDisplayName());
@@ -200,6 +205,13 @@ public class NpcFileSelector implements Listener {
                 .getPersistentDataContainer()
                 .get(new NamespacedKey(plugin, "filename"),
                         PersistentDataType.STRING);
+
+        if (mode == Mode.PROMPT_SET) {
+            p.sendMessage(ChatColor.GREEN + "프롬프트 파일 적용 완료: " + sel);
+            // 👉 프롬프트 적용 후 모델에 전송
+            manager.sendReloadPromptToModel();
+            p.closeInventory();
+        }
 
         // 버튼 처리
         switch (label) {
@@ -215,10 +227,6 @@ public class NpcFileSelector implements Listener {
 
             case "✔ 적용", "✔ 선택" -> {
                 // 현재 선택한 파일 확인
-                String sel = (mode == Mode.PROMPT_SET
-                        ? selectedForSet.get(id)
-                        : selectedForFix.get(id)
-                );
                 if (sel == null) {
                     p.sendMessage(ChatColor.RED + "먼저 파일을 선택하세요.");
                     return;

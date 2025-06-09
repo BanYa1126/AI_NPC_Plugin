@@ -64,31 +64,76 @@ public class PersistentModelClient {
     }
 
     // 메시지 전송 및 응답 수신 (NPC 코드 포함)
-    public synchronized String sendChatMessage(String playerName, String npcCode, String message) {
+    // 메시지 전송 및 응답 수신
+    public synchronized String sendMessage(String playerName, String npcCode, String message) {
+        if (!isConnected()) {
+            return "모델 서버와 연결되어 있지 않습니다.";
+        }
+
+        try {
+            // 요청 구성
+            Map<String, String> request = new HashMap<>();
+            request.put("action", "chat");
+            request.put("player_name", playerName);
+            request.put("npc_code", npcCode);
+            request.put("player_message", message);
+
+            // JSON 직렬화 후 전송
+            String jsonRequest = gson.toJson(request);
+            writer.write(jsonRequest);
+            writer.newLine();
+            writer.flush();
+
+            // 응답 수신
+            String jsonResponse = reader.readLine();
+            if (jsonResponse == null) return "모델 응답 없음.";
+
+            Map<String, Object> response = gson.fromJson(jsonResponse, Map.class);
+            return (String) response.getOrDefault("npc_response", "⚠️ 응답 파싱 실패");
+
+        } catch (IOException e) {
+            connected = false;
+            return "오류 발생: " + e.getMessage();
+        }
+    }
+    public synchronized String sendReload(Map<String, Object> packet) {
         if (!isConnected()) {
             return "⚠️ 모델 서버와 연결되어 있지 않습니다.";
         }
 
         try {
-            // 요청 구성
-            Map<String, Object> request = new HashMap<>();
-            request.put("action", "chat");
-            request.put("player_name", playerName);
-            request.put("npc_code", npcCode);  // 중요!
-            request.put("player_message", message);
-
-            String jsonRequest = gson.toJson(request);
-
+            String jsonRequest = gson.toJson(packet);
             writer.write(jsonRequest);
-            writer.write("\n");
+            writer.newLine();
+            writer.flush();
+
+            String jsonResponse = reader.readLine();
+            if (jsonResponse == null) return "⚠️ 모델 응답 없음.";
+
+            return jsonResponse;
+
+        } catch (IOException e) {
+            connected = false;
+            return "❌ 오류 발생: " + e.getMessage();
+        }
+    }
+    // 프롬프트 리로드 요청
+    public synchronized String sendReloadPrompt(String jsonData) {
+        if (!isConnected()) {
+            return "⚠️ 모델 서버와 연결되어 있지 않습니다.";
+        }
+
+        try {
+            // 요청 JSON 보내기
+            writer.write(jsonData);
+            writer.newLine();
             writer.flush();
 
             // 응답 수신
             String jsonResponse = reader.readLine();
             if (jsonResponse == null) return "⚠️ 모델 응답 없음.";
 
-            Map<String, Object> response = gson.fromJson(jsonResponse, Map.class);
-            return (String) response.getOrDefault("npc_response", "⚠️ 응답 파싱 실패");
+            return jsonResponse;
 
         } catch (IOException e) {
             connected = false;
@@ -96,4 +141,3 @@ public class PersistentModelClient {
         }
     }
 }
-

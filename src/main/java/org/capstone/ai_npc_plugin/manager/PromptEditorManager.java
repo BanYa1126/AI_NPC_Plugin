@@ -8,15 +8,14 @@ import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 import org.bukkit.entity.Villager;
 import org.bukkit.plugin.Plugin;
+import org.capstone.ai_npc_plugin.AI_NPC_Plugin;
 import org.capstone.ai_npc_plugin.gui.NpcFileSelector;
 import org.capstone.ai_npc_plugin.listener.NpcGUIListener;
 import org.capstone.ai_npc_plugin.npc.PromptData;
 
 import java.io.File;
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
+import java.util.*;
 import java.lang.reflect.Type;
 import com.google.gson.reflect.TypeToken;
 import java.io.FileInputStream;
@@ -246,5 +245,31 @@ public class PromptEditorManager {
             }
         }
         return false;
+    }
+    // 현재 allData 를 모델 서버로 전송
+    public void sendReloadPromptToModel() {
+        AI_NPC_Plugin main = (AI_NPC_Plugin) plugin;
+
+        if (main.getPersistentModelClient() == null || !main.getPersistentModelClient().isConnected()) {
+            main.getLogger().warning("모델 서버와 연결되어 있지 않아 프롬프트를 전송할 수 없습니다.");
+            return;
+        }
+
+        if (allData == null || allData.isEmpty()) {
+            main.getLogger().warning("현재 로드된 프롬프트 데이터가 없습니다.");
+            return;
+        }
+
+        Gson gson = new GsonBuilder().setPrettyPrinting().create();
+
+        // 프롬프트 형식에 맞게 "npcs" 필드로 보내기
+        Map<String, Object> request = new HashMap<>();
+        request.put("npcs", allData);
+
+        String jsonData = gson.toJson(request);
+
+        // 모델 서버로 전송
+        String response = main.getPersistentModelClient().sendReloadPrompt(jsonData);
+        main.getLogger().info("모델 서버 응답 (reload): " + response);
     }
 }

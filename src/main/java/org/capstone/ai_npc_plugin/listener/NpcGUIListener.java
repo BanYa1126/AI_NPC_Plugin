@@ -171,9 +171,16 @@ public class NpcGUIListener implements Listener {
                 PromptData d = manager.getCurrentData();
 
                 if (dataMode == DataSelectorHolder.DataMode.CREATE) {
+                    // ─ CREATE 모드: NPC 스폰 후 이름 설정
                     Villager npc = playerNpcForCreate.remove(id);
                     npc.setCustomName(d.name);
-                    p.sendMessage(ChatColor.GREEN + "NPC 생성 및 이름 설정: " + d.name);
+                    npc.getPersistentDataContainer().set(
+                            new NamespacedKey(plugin, "npc_code"),
+                            PersistentDataType.STRING,
+                            d.code
+                    );
+
+                    p.sendMessage(ChatColor.GREEN + "NPC 생성 및 이름 설정: " + d.name + " (코드: " + d.code + ")");
                     p.closeInventory();
                 } else {
                     p.closeInventory();

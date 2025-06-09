@@ -66,18 +66,19 @@ public class ModelCommand implements CommandExecutor {
             case "reload":
                 List<PromptData> npcs = plugin.getNpcManager().getAllData();
                 if (npcs.isEmpty()) {
-                    sender.sendMessage(ChatColor.RED + "프롬프트에 NPC 데이터가 없습니다.");
+                    sender.sendMessage(ChatColor.RED + "로드할 NPC 프롬프트 데이터가 없습니다.");
                     return true;
                 }
 
-                boolean sent = sendReloadRequest(npcs);
+                // JSON 패킷 구성
+                Map<String, Object> packet = new HashMap<>();
+                packet.put("action", "reload");
+                packet.put("npcs", npcs);
 
-                if (sent) {
-                    sender.sendMessage(ChatColor.GREEN + "프롬프트 데이터를 모델 서버에 적용했습니다. (NPC " + npcs.size() + "명)");
-                } else {
-                    sender.sendMessage(ChatColor.RED + "모델 서버와 통신에 실패했습니다.");
-                }
+                // 모델 서버로 전송 (PersistentModelClient에 sendReload 메서드 추가 필요)
+                String result = plugin.getPersistentModelClient().sendReload(packet);
 
+                sender.sendMessage(ChatColor.GREEN + "모델 서버에 프롬프트 적용 요청 완료: " + result);
                 return true;
 
             default:

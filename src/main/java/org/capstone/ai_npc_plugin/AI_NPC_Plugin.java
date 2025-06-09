@@ -12,6 +12,7 @@ import org.capstone.ai_npc_plugin.listener.ChatListener;
 import org.capstone.ai_npc_plugin.manager.PromptEditorManager;
 import org.capstone.ai_npc_plugin.listener.CombatAssistListener;
 import org.capstone.ai_npc_plugin.listener.NpcInteractListener;
+import org.capstone.ai_npc_plugin.network.PersistentModelClient;
 import org.capstone.ai_npc_plugin.npc.AINPC;
 import org.capstone.ai_npc_plugin.manager.NPCStateManager;
 
@@ -63,12 +64,15 @@ public final class AI_NPC_Plugin extends JavaPlugin {
     private int followTaskId;
     private int combatTaskId;
 
+    private PersistentModelClient persistentModelClient;
+
     // Getter 메서드
     public Map<UUID, UUID> getFollowMap() { return followMap; }
     public Map<UUID, UUID> getAssistMap() { return assistMap; }
     public Map<UUID, UUID> getNpcTargetMap() { return npcTargetMap; }
     public PromptEditorManager getNpcManager() { return promptEditorManager; }
     public NPCStateManager getNpcStateManager() { return npcStateManager; }
+    public PersistentModelClient getPersistentModelClient() { return persistentModelClient; }
 
     /**
      * 플러그인 활성화 시 호출
@@ -78,13 +82,16 @@ public final class AI_NPC_Plugin extends JavaPlugin {
 
         // config.yml 기본 저장
         saveDefaultConfig();
-
         // 프롬프트 폴더 설정값 가져오기
         String folderPath = getConfig().getString("promptDataFolder", "promptData");
 
         // Prompt 및 NPC 상태 매니저 초기화
         promptEditorManager = new PromptEditorManager(this, folderPath);
         npcStateManager = new NPCStateManager(getDataFolder());
+        persistentModelClient = new PersistentModelClient();
+
+        // 모델 클라이언트 연결
+        persistentModelClient.connect();
 
         // 명령어 등록
         getCommand("model").setExecutor(new ModelCommand(this));
@@ -95,7 +102,7 @@ public final class AI_NPC_Plugin extends JavaPlugin {
         getCommand("ainpc_action").setTabCompleter(new AINPCActionTabCompleter());
 
         // 리스너 등록
-        getServer().getPluginManager().registerEvents(new ChatListener(), this);
+        getServer().getPluginManager().registerEvents(new ChatListener(this), this);
         getServer().getPluginManager().registerEvents(new NpcInteractListener(this), this);
         getServer().getPluginManager().registerEvents(new AffinityListener(this), this);
         getServer().getPluginManager().registerEvents(new CombatAssistListener(this), this);
@@ -132,10 +139,8 @@ public final class AI_NPC_Plugin extends JavaPlugin {
      */
     @Override
     public void onDisable() {
-
         // 우호도 상태 저장 (최종 저장)
         npcStateManager.save();
-
         // 주기적 Task 해제
         getServer().getScheduler().cancelTask(autoSaveTaskId);
         getServer().getScheduler().cancelTask(followTaskId);
@@ -143,6 +148,11 @@ public final class AI_NPC_Plugin extends JavaPlugin {
 
         // 모델 서버 종료
         ModelCommand.shutdownModel();
+
+        // 모델 클라이언트 연결 해제
+        if (persistentModelClient != null && persistentModelClient.isConnected()) {
+            persistentModelClient.disconnect();
+        }
 
         getLogger().info("AI_NPC_Plugin 비활성화됨");
     }
