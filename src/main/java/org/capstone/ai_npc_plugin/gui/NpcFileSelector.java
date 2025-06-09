@@ -155,17 +155,45 @@ public class NpcFileSelector implements Listener {
                             : ChatColor.WHITE  + f.getName()
             );
 
-            // Lore 설정 (JSON 내부 name 정보 표시)
-            m.setLore(parseJsonDetails(f));
+            List<String> lore = new ArrayList<>();
+            try (InputStreamReader reader = new InputStreamReader(
+                    new FileInputStream(f), StandardCharsets.UTF_8)) {
 
-            // filename 태그 저장
+                JsonElement root = JsonParser.parseReader(reader);
+                if (root.isJsonObject()) {
+                    JsonObject obj = root.getAsJsonObject();
+                    if (obj.has("backgrounds")) {
+                        for (JsonElement bgel : obj.getAsJsonArray("backgrounds")) {
+                            JsonObject bg = bgel.getAsJsonObject();
+                            lore.add(ChatColor.GRAY + "Code : " + bg.get("code").getAsString());
+                            lore.add(ChatColor.GRAY + "Era  : " + bg.get("era").getAsString());
+                            lore.add(ChatColor.GRAY + "Desc : " + bg.get("description").getAsString());
+
+                            for (JsonElement cel : bg.getAsJsonArray("cities")) {
+                                JsonObject city = cel.getAsJsonObject();
+                                lore.add(
+                                        ChatColor.DARK_GRAY + "- " + city.get("name").getAsString()
+                                                + " (" + city.get("type").getAsString() + "): "
+                                                + city.get("description").getAsString()
+                                );
+                            }
+                            lore.add("");  // 배경 블록 간 여백
+                        }
+                    }
+                }
+            } catch (IOException e) {
+                plugin.getLogger().warning("프롬프트 파싱 실패: " + f.getName());
+            }
+            m.setLore(lore);
+
+            // 3) filename 태그 저장
             m.getPersistentDataContainer()
                     .set(new NamespacedKey(plugin, "filename"),
                             PersistentDataType.STRING,
                             f.getName());
             it.setItemMeta(m);
 
-            // GUI 슬롯에 추가
+            // 4) GUI 슬롯에 추가
             gui.setItem(i - idx, it);
         }
 
