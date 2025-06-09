@@ -1,13 +1,18 @@
 package org.capstone.ai_npc_plugin.manager;
 
-import com.google.gson.Gson;
-import com.google.gson.GsonBuilder;
-import com.google.gson.JsonElement;
-import com.google.gson.JsonParser;
+import com.google.gson.*;
 import org.bukkit.Bukkit;
+import org.bukkit.ChatColor;
+import org.bukkit.Material;
+import org.bukkit.NamespacedKey;
 import org.bukkit.entity.Player;
 import org.bukkit.entity.Villager;
+import org.bukkit.inventory.Inventory;
+import org.bukkit.inventory.ItemStack;
+import org.bukkit.inventory.meta.ItemMeta;
+import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.plugin.Plugin;
+import org.capstone.ai_npc_plugin.gui.DataFixHolder;
 import org.capstone.ai_npc_plugin.gui.NpcFileSelector;
 import org.capstone.ai_npc_plugin.listener.NpcGUIListener;
 import org.capstone.ai_npc_plugin.npc.PromptData;
@@ -66,6 +71,8 @@ public class PromptEditorManager {
 
     // 현재 로드된 파일
     private File currentDataFile;
+
+    public enum DataCategory { PLAYERS, NPCS; }
 
     // 생성자 - 폴더 경로 설정, GUI 리스너 초기화
     public PromptEditorManager(Plugin plugin, String folderPath) {
@@ -226,9 +233,78 @@ public class PromptEditorManager {
         fileSelector.openGUI(player, null, NpcFileSelector.Mode.PROMPT_FIX);
     }
 
+
+
     // NPC 데이터 수정용 GUI 열기 (프롬프트 FIX 단계에서 호출)
     public void openNpcEditGUI(Player player) {
+        // 1) 파일 선택 후 “✔ 변경” 시 호출 → Players/NPCs 고르는 두 번째 GUI 열기
         guiListener.openFixSelector(player);
+        // 이후 플레이어가 Players 혹은 NPCs 를 고르면 manager.openDataFixGUI() 가 실행됩니다.
+    }
+
+    //Players 또는 NPCs 데이터를 고른 뒤, 실제 수정할 항목 리스트를 GUI 로 띄웁니다.
+    public void openDataFixGUI(Player player, DataCategory category) {
+        File file = currentDataFile;  // loadPromptFile / setCurrentDataByCode 로 이미 세팅된 파일
+        JsonObject root;
+        try (InputStreamReader reader = new InputStreamReader(
+                new FileInputStream(file), StandardCharsets.UTF_8)) {
+            root = JsonParser.parseReader(reader).getAsJsonObject();
+        } catch (IOException ex) {
+            plugin.getLogger().severe("JSON 열기 실패: " + ex.getMessage());
+            player.sendMessage(ChatColor.RED + "데이터 로드에 실패했습니다.");
+            return;
+        }
+        // players 또는 npcs 배열 선택
+        JsonArray arr = category == DataCategory.PLAYERS
+                ? root.getAsJsonArray("players")
+                : root.getAsJsonArray("npcs");
+        // GUI 크기: 9칸 단위로 올림
+        int size = ((arr.size() - 1) / 9 + 1) * 9;
+        Inventory gui = Bukkit.createInventory(
+                new DataFixHolder(category), size,
+                "📋 " + (category == DataCategory.PLAYERS ? "Players 수정" : "NPCs 수정")
+        );
+        // 각 항목을 PAPER 아이템으로 표시
+        for (JsonElement el : arr) {
+            JsonObject o = el.getAsJsonObject();
+            String code = o.get("code").getAsString();
+
+            ItemStack it = new ItemStack(Material.PAPER);
+            ItemMeta meta = it.getItemMeta();
+            meta.setDisplayName(ChatColor.WHITE + code);
+
+            List<String> lore = new ArrayList<>();
+            if (category == DataCategory.PLAYERS) {
+                lore.add(ChatColor.GRAY + "Name   : " + o.get("name").getAsString());
+                lore.add(ChatColor.GRAY + "Job    : " + o.get("job").getAsString());
+                lore.add(ChatColor.GRAY + "Status : " + o.get("social_status").getAsString());
+                lore.add(ChatColor.GRAY + "Gender : " + o.get("gender").getAsString());
+            } else {
+                lore.add(ChatColor.GRAY + "Name       : " + o.get("name").getAsString());
+                lore.add(ChatColor.GRAY + "Era        : " + o.get("era").getAsString());
+                lore.add(ChatColor.GRAY + "Job        : " + o.get("job").getAsString());
+                lore.add(ChatColor.GRAY + "Status     : " + o.get("social_status").getAsString());
+                lore.add(ChatColor.GRAY + "Gender     : " + o.get("gender").getAsString());
+                lore.add(ChatColor.GRAY + "Relation   : " + o.get("relation").getAsString());
+                lore.add(ChatColor.GRAY + "City       : " + o.get("city").getAsString());
+                lore.add(ChatColor.GRAY + "Description: " + o.get("description").getAsString());
+            }
+            meta.setLore(lore);
+            // 클릭 시 식별용 code 태그
+            meta.getPersistentDataContainer().set(
+                    new NamespacedKey(plugin, "fix_code"),
+                    PersistentDataType.STRING,
+                    code
+            );
+            it.setItemMeta(meta);
+            gui.addItem(it);
+        }
+        // 마지막 슬롯에 취소 버튼
+        ItemStack cancel = new ItemStack(Material.RED_CONCRETE);
+        ItemMeta cm = cancel.getItemMeta();
+        cm.setDisplayName("✘ 취소");
+        cancel.setItemMeta(cm);gui.setItem(size - 1, cancel);
+        player.openInventory(gui);
     }
 
     // 현재 전체 데이터 목록 반환
