@@ -102,6 +102,7 @@ public class NpcGUIListener implements Listener {
             if (selCode != null && selCode.equals(data.code)) {
                 disp = ChatColor.YELLOW + "✔ " + data.code;
             }
+
             meta.setDisplayName(disp);
 
             List<String> lore = new ArrayList<>();
