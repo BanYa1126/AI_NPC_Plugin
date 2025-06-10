@@ -16,6 +16,8 @@ import org.capstone.ai_npc_plugin.AI_NPC_Plugin;
 import org.capstone.ai_npc_plugin.gui.DataFixHolder;
 import org.capstone.ai_npc_plugin.gui.NpcFileSelector;
 import org.capstone.ai_npc_plugin.listener.NpcGUIListener;
+import org.capstone.ai_npc_plugin.npc.BackgroundData;
+import org.capstone.ai_npc_plugin.npc.PlayerData;
 import org.capstone.ai_npc_plugin.npc.PromptData;
 
 import java.io.File;
@@ -23,6 +25,8 @@ import java.io.IOException;
 import java.util.*;
 import java.lang.reflect.Type;
 import com.google.gson.reflect.TypeToken;
+import org.capstone.ai_npc_plugin.npc.WorldPrompt;
+
 import java.io.FileInputStream;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
@@ -52,27 +56,21 @@ public class PromptEditorManager {
 
     // 플러그인 인스턴스
     private final Plugin plugin;
-
     // 프롬프트 JSON 데이터 저장 폴더
     private final File promptDataFolder;
-
     // 프롬프트 파일 선택 GUI
     private final NpcFileSelector fileSelector;
-
     // NPC 데이터 선택/수정 GUI
     private final NpcGUIListener guiListener;
-
     // 전체 프롬프트 데이터 목록 (현재 로드된 것)
     private List<PromptData> allData;
-
     // 현재 선택된 PromptData
     private PromptData currentData;
-
     // 현재 로드된 파일
     private File currentDataFile;
-
+    private List<PlayerData> players;
+    private List<BackgroundData> backgrounds;
     public enum DataCategory { PLAYERS, NPCS; }
-
     // 생성자 - 폴더 경로 설정, GUI 리스너 초기화
     public PromptEditorManager(Plugin plugin, String folderPath) {
         this.plugin = plugin;
@@ -135,31 +133,30 @@ public class PromptEditorManager {
                 new FileInputStream(file),
                 StandardCharsets.UTF_8
         )) {
-            // JSON 파싱
-            JsonElement je = JsonParser.parseReader(reader);
-
-            if (je.isJsonArray()) {
-                // 배열 형태 처리
-                Type listType = new TypeToken<List<PromptData>>() {}.getType();
-                allData = gson.fromJson(je, listType);
-            } else if (je.isJsonObject()) {
-                // 단일 객체 처리
-                PromptData single = gson.fromJson(je, PromptData.class);
-                allData = new ArrayList<>();
-                allData.add(single);
-            } else {
-                plugin.getLogger().severe("지원하지 않는 JSON 형식입니다: root is " + je);
-                return false;
+            WorldPrompt wrapper = gson.fromJson(reader, WorldPrompt.class);
+            if (wrapper.npcs != null) {
+                this.allData = wrapper.npcs;
             }
-
-            // 현재 데이터 파일 기록
-            currentDataFile = file;
+            if (wrapper.players != null) {
+                this.players = wrapper.players;
+            }
+            if (wrapper.backgrounds != null) {
+                this.backgrounds = wrapper.backgrounds;
+            }
+            this.currentDataFile = file;
             return true;
-
         } catch (IOException e) {
-            plugin.getLogger().severe("NPC 데이터 로드 실패: " + e.getMessage());
+            plugin.getLogger().severe("프롬프트 로드 실패: " + e.getMessage());
             return false;
         }
+    }
+
+    public List<PlayerData> getPlayers() {
+        return players != null ? players : Collections.emptyList();
+    }
+
+    public List<BackgroundData> getBackgrounds() {
+        return backgrounds != null ? backgrounds : Collections.emptyList();
     }
 
     // 현재 선택된 데이터 반환
@@ -218,8 +215,11 @@ public class PromptEditorManager {
                 new FileOutputStream(currentDataFile),
                 StandardCharsets.UTF_8
         )) {
-            // 현재 전체 데이터(allData)를 저장
-            gson.toJson(allData, w);
+            // 전체 데이터를 WorldPrompt 구조로 감싸기
+            WorldPrompt wrapper = new WorldPrompt();
+            wrapper.npcs = allData;
+
+            gson.toJson(wrapper, w);
 
         } catch (IOException ex) {
             plugin.getLogger().severe("NPC 데이터 저장 실패: " + ex.getMessage());
@@ -331,20 +331,15 @@ public class PromptEditorManager {
             return;
         }
 
-        if (allData == null || allData.isEmpty()) {
-            main.getLogger().warning("현재 로드된 프롬프트 데이터가 없습니다.");
-            return;
-        }
-
         Gson gson = new GsonBuilder().setPrettyPrinting().create();
 
-        // 프롬프트 형식에 맞게 "npcs" 필드로 보내기
-        Map<String, Object> request = new HashMap<>();
-        request.put("npcs", allData);
+        WorldPrompt wrapper = new WorldPrompt();
+        wrapper.npcs = allData;
+        wrapper.players = players;
+        wrapper.backgrounds = backgrounds;
 
-        String jsonData = gson.toJson(request);
-
-        // 모델 서버로 전송
+        String jsonData = gson.toJson(wrapper);
+        main.getLogger().info("전송할 프롬프트 JSON:\n" + jsonData);
         String response = main.getPersistentModelClient().sendReloadPrompt(jsonData);
         main.getLogger().info("모델 서버 응답 (reload): " + response);
     }
