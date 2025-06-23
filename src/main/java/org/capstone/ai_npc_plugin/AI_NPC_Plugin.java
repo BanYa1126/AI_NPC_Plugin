@@ -170,19 +170,22 @@ public final class AI_NPC_Plugin extends JavaPlugin {
             Villager npc = (Villager) Bukkit.getEntity(npcId);
             if (npc == null || npc.isDead()) continue;
 
-            npc.setAI(true);
+            npc.setAI(true); // AI 활성화
 
-            double distance = player.getLocation().distance(npc.getLocation());
+            Location playerLoc = player.getLocation();
+            Location npcLoc = npc.getLocation();
+            double distance = playerLoc.distance(npcLoc);
 
             if (distance > 15) {
-                // 너무 멀면 순간이동
-                npc.teleport(player.getLocation().add(1, 0, 1));
+                // 15m 이상: 순간이동
+                npc.teleport(playerLoc.add(1, 0, 1));
             } else if (distance > 2.5) {
-                // 가까이 이동 (플레이어 뒤쪽)
-                Location target = player.getLocation().clone().add(player.getLocation().getDirection().normalize().multiply(-2));
-                target.setY(player.getLocation().getY());
-                npc.teleport(target);
+                // 2.5~15m: 이동 경로 설정
+                Location behindPlayer = playerLoc.clone().add(playerLoc.getDirection().normalize().multiply(-2));
+                behindPlayer.setY(playerLoc.getY()); // Y 값 유지
+                npc.getPathfinder().moveTo(behindPlayer); // 걸어서 이동 (Paper API 기준)
             }
+            // 2.5 이하: 정지 (아무 동작 없음)
         }
     }
 
