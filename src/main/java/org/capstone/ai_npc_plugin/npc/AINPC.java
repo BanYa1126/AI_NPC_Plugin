@@ -1,9 +1,10 @@
 package org.capstone.ai_npc_plugin.npc;
+
+import org.capstone.ai_npc_plugin.AI_NPC_Plugin;
 /**
  * AINPC
  * - AI NPC의 논리적 데이터 구조를 담당하는 클래스
  * - 현재 상호작용 중인 글로벌 NPC 객체로 사용됨 (AI_NPC_Plugin.globalNpc)
- *
  * 주요 기능:
  * - 이름 / 프롬프트 관리
  * - 대화 로그 관리
@@ -24,6 +25,7 @@ public class AINPC {
     private String name = "기본 이름";
     // 현재 프롬프트 내용
     private String prompt = "기본 프롬프트";
+    private PromptData promptData;
     // 플레이어와의 대화 로그 (누적)
     private StringBuilder chatLog = new StringBuilder();
     // 우호도 점수 (0~100)
@@ -37,6 +39,10 @@ public class AINPC {
 
     public String getPrompt() { return prompt; }
     public void setPrompt(String prompt) { this.prompt = prompt; }
+
+    public PromptData getPromptData() { return promptData; }
+
+    public void setPromptData(PromptData promptData) { this.promptData = promptData; }
 
     // --- 대화 로그 관리 ---
 
@@ -66,7 +72,13 @@ public class AINPC {
     public void setAffinityScore(int score) {
         this.affinityScore = Math.max(0, Math.min(100, score));
         updateAffinityLevel();
+
+        // 현재 프롬프트에도 반영 (global NPC의 프롬프트일 때)
+        if (AI_NPC_Plugin.globalNpc == this && AI_NPC_Plugin.globalNpc.getPromptData() != null) {
+            AI_NPC_Plugin.globalNpc.getPromptData().affinityScore = this.affinityScore;
+        }
     }
+
     // 현재 우호도 레벨 반환
     public AffinityLevel getAffinityLevel() {return affinityLevel;}
     // 우호도 점수에 따른 우호도 레벨 자동 계산

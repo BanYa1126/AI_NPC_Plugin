@@ -12,4 +12,5 @@ public class PromptData {
     public String city;
     public String description;
     public String background_code;
+    public int affinityScore = 50;
 }

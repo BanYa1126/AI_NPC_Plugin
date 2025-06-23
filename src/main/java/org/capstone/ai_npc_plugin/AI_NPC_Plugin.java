@@ -15,6 +15,7 @@ import org.capstone.ai_npc_plugin.listener.NpcInteractListener;
 import org.capstone.ai_npc_plugin.network.PersistentModelClient;
 import org.capstone.ai_npc_plugin.npc.AINPC;
 import org.capstone.ai_npc_plugin.manager.NPCStateManager;
+import org.capstone.ai_npc_plugin.npc.PromptData;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -41,24 +42,18 @@ public final class AI_NPC_Plugin extends JavaPlugin {
 
     // 글로벌 NPC 인스턴스 (Prompt 적용 시 사용됨)
     public static AINPC globalNpc = new AINPC();
-
     // 프롬프트 관리
     private PromptEditorManager promptEditorManager;
-
     // NPC 우호도 관리
     private NPCStateManager npcStateManager;
-
     // 자동 저장 task ID
     private int autoSaveTaskId;
-
     // 플레이어 → 따라오는 NPC (follow 명령어)
     private final Map<UUID, UUID> followMap = new HashMap<>();
-
+    // NPC 대기 (wait 명령어)
     private final Map<UUID, UUID> waitMap = new HashMap<>();
-
     // 플레이어 → 전투 지원 NPC (assist 명령어)
     private final Map<UUID, UUID> assistMap = new HashMap<>();
-
     // NPC → 현재 공격중인 타겟
     public Map<UUID, UUID> npcTargetMap = new HashMap<>();
 
@@ -67,6 +62,8 @@ public final class AI_NPC_Plugin extends JavaPlugin {
     private int combatTaskId;
 
     private PersistentModelClient persistentModelClient;
+
+    private PromptData promptData;
 
     // Getter 메서드
     public Map<UUID, UUID> getFollowMap() { return followMap; }
@@ -158,6 +155,14 @@ public final class AI_NPC_Plugin extends JavaPlugin {
         }
 
         getLogger().info("AI_NPC_Plugin 비활성화됨");
+    }
+
+    public void setPromptData(PromptData data) {
+        this.promptData = data;
+    }
+
+    public PromptData getPromptData() {
+        return this.promptData;
     }
 
     /**
