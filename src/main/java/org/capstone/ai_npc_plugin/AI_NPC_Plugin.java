@@ -205,7 +205,11 @@ public final class AI_NPC_Plugin extends JavaPlugin {
      * 주기적 전투 AI Task
      * NPC → 타겟 공격 동작
      */
+    private final Map<UUID, Long> lastAttackTime = new HashMap<>();
+
     private void runCombatTask() {
+        long now = System.currentTimeMillis();
+
         for (Map.Entry<UUID, UUID> entry : npcTargetMap.entrySet()) {
             UUID npcId = entry.getKey();
             UUID targetId = entry.getValue();
@@ -214,7 +218,6 @@ public final class AI_NPC_Plugin extends JavaPlugin {
             LivingEntity target = (LivingEntity) Bukkit.getEntity(targetId);
 
             if (npc == null || npc.isDead() || target == null || target.isDead()) {
-                // 타겟 종료 시 해제
                 npcTargetMap.remove(npcId);
                 continue;
             }
@@ -224,16 +227,23 @@ public final class AI_NPC_Plugin extends JavaPlugin {
             double distance = npc.getLocation().distance(target.getLocation());
 
             if (distance > 15) {
-                // 너무 멀면 추격
                 npc.teleport(target.getLocation().add(1, 0, 1));
             } else if (distance > 2.5) {
-                // 접근 이동
-                Location targetLoc = target.getLocation().clone().add(target.getLocation().getDirection().normalize().multiply(-1));
-                npc.teleport(targetLoc);
+                Location approach = target.getLocation().clone().add(target.getLocation().getDirection().normalize().multiply(-1));
+                npc.teleport(approach);
             } else {
-                // 근접 공격
-                target.damage(2.0, npc);
-                npc.getWorld().playSound(npc.getLocation(), "entity.player.attack.crit", 1.0f, 1.0f);
+                // 공격 쿨타임 확인 (예: 2초)
+                long last = lastAttackTime.getOrDefault(npcId, 0L);
+                if (now - last >= 2000) {
+                    lastAttackTime.put(npcId, now);
+
+                    // 피해 적용
+                    target.damage(2.0, npc);
+
+                    // 사운드 효과 (근접 타격 느낌)
+                    npc.getWorld().playSound(npc.getLocation(), "entity.player.attack.crit", 1.0f, 1.0f);
+                    npc.getWorld().spawnParticle(org.bukkit.Particle.CRIT, target.getLocation(), 10);
+                }
             }
         }
     }
