@@ -246,12 +246,12 @@ public class NpcGUIListener implements Listener {
                             d.code
                     );
 
-                    p.sendMessage(ChatColor.GREEN + "NPC 생성 및 이름 설정: " + d.name + " (코드: " + d.code + ")");
+                    p.sendMessage(ChatColor.GREEN + "NPC 생성, 이름 : " + d.name);
                     p.closeInventory();
                 } else {
                     // Fix 모드: Players/NPCs 선택 GUI 호출
                     p.closeInventory();
-                    openPromptFixGUI(p);
+                    manager.openNpcEditGUI(p);
                 }
             }
             case "✘ 취소" -> p.closeInventory();

@@ -232,8 +232,6 @@ public class PromptEditorManager {
         fileSelector.openGUI(player, null, NpcFileSelector.Mode.PROMPT_FIX);
     }
 
-
-
     // NPC 데이터 수정용 GUI 열기 (프롬프트 FIX 단계에서 호출)
     public void openNpcEditGUI(Player player) {
         // 1) 파일 선택 후 “✔ 변경” 시 호출 → Players/NPCs 고르는 두 번째 GUI 열기

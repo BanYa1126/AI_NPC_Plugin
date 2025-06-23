@@ -235,7 +235,6 @@ public class NpcFileSelector implements Listener {
                         PersistentDataType.STRING);
 
         if (mode == Mode.PROMPT_SET) {
-            p.sendMessage(ChatColor.GREEN + "프롬프트 파일 적용 완료: " + sel);
             // 👉 프롬프트 적용 후 모델에 전송
             manager.sendReloadPromptToModel();
             p.closeInventory();
@@ -267,13 +266,13 @@ public class NpcFileSelector implements Listener {
                     return;
                 }
 
-                // 적용 후 처리
+                // 적용, 선택 후 처리
                 if (mode == Mode.PROMPT_SET) {
                     p.sendMessage(ChatColor.GREEN + "프롬프트 파일 적용 완료: " + sel);
                     p.closeInventory();
                 } else {
                     p.closeInventory();
-                    manager.openNpcEditGUI(p);
+                    manager.openPromptFixGUI(p);
                 }
             }
 
