@@ -20,8 +20,10 @@ import org.bukkit.plugin.Plugin;
 import org.capstone.ai_npc_plugin.gui.DataFixHolder;
 import org.capstone.ai_npc_plugin.gui.DataSelectorHolder;
 import org.capstone.ai_npc_plugin.manager.PromptEditorManager;
+import org.capstone.ai_npc_plugin.npc.PlayerData;
 import org.capstone.ai_npc_plugin.npc.PromptData;
 import org.capstone.ai_npc_plugin.manager.PromptEditorManager.DataCategory;
+import org.capstone.ai_npc_plugin.gui.NpcFileSelector;
 
 import java.util.*;
 
@@ -37,6 +39,7 @@ public class NpcGUIListener implements Listener {
     private final Map<UUID, Villager> playerNpcForCreate = new HashMap<>();
     private final Plugin plugin;
     private final PromptEditorManager manager;
+    private NpcFileSelector fileSelector;
 
     private static final int GUI_SIZE = 54;
     private static final int ITEMS_PER_PAGE = 45;
@@ -45,7 +48,7 @@ public class NpcGUIListener implements Listener {
     private final Map<UUID, String> playerSelectedCode = new HashMap<>();
 
     private static class EditState {
-        PromptData data;
+        Object data; // PromptData 또는 PlayerData
         int step;
         String selectedField;
     }
@@ -54,6 +57,10 @@ public class NpcGUIListener implements Listener {
     public NpcGUIListener(Plugin plugin, PromptEditorManager manager) {
         this.plugin = plugin;
         this.manager = manager;
+    }
+
+    public void setFileSelector(NpcFileSelector fileSelector) {
+        this.fileSelector = fileSelector;
     }
 
     public void openFixSelector(Player player) {
@@ -157,14 +164,28 @@ public class NpcGUIListener implements Listener {
         // ─── 두 번째 GUI (Players/NPCs 수정 목록) 처리 ───
         if (holder instanceof DataFixHolder dfh) {
             e.setCancelled(true);
-
             ItemStack clicked = e.getCurrentItem();
             if (clicked == null || !clicked.hasItemMeta()) return;
+
             String label = ChatColor.stripColor(clicked.getItemMeta().getDisplayName());
+
+            // 카테고리 선택
+            if (label.equals("Players")) {
+                p.closeInventory(); // 현재 인벤토리를 닫습니다.
+                manager.openDataFixGUI(p, PromptEditorManager.DataCategory.PLAYERS);
+                return;
+            } else if (label.equals("NPCs")) {
+                p.closeInventory(); // 현재 인벤토리를 닫습니다.
+                manager.openDataFixGUI(p, PromptEditorManager.DataCategory.NPCS);
+                return;
+            }
 
             // 취소 버튼
             if (label.equals("✘ 취소")) {
                 p.closeInventory();
+                fileSelector.clearSelectedForFix(id);
+                playerSelectedCode.remove(id);
+                playerPage.remove(id);
                 return;
             }
 
@@ -174,13 +195,22 @@ public class NpcGUIListener implements Listener {
                     .get(new NamespacedKey(plugin, "fix_code"), PersistentDataType.STRING);
             if (code == null) return;
 
-            // manager 에 코드 적용
-            if (!manager.setCurrentDataByCode(code)) {
-                p.sendMessage(ChatColor.RED + "데이터 로드에 실패했습니다.");
-                p.closeInventory();
-                return;
+            Object d;
+            if (dfh.getCategory() == DataCategory.PLAYERS) {
+                if (!manager.setCurrentPlayerDataByCode(code)) {
+                    p.sendMessage(ChatColor.RED + "데이터 로드에 실패했습니다.");
+                    p.closeInventory();
+                    return;
+                }
+                d = manager.getCurrentPlayerData();
+            } else {
+                if (!manager.setCurrentDataByCode(code)) {
+                    p.sendMessage(ChatColor.RED + "데이터 로드에 실패했습니다.");
+                    p.closeInventory();
+                    return;
+                }
+                d = manager.getCurrentData();
             }
-            PromptData d = manager.getCurrentData();
 
             // EditState 초기화 → 채팅 1단계 진입
             p.closeInventory();
@@ -197,7 +227,9 @@ public class NpcGUIListener implements Listener {
             p.sendMessage(ChatColor.YELLOW + "수정 가능한 항목과 현재 값:");
             for (int i = 0; i < fields.length; i++) {
                 String f = fields[i];
-                String val = getFieldValue(d, f);
+                String val = (dfh.getCategory() == DataCategory.PLAYERS)
+                        ? getFieldValue((PlayerData)d, f)
+                        : getFieldValue((PromptData)d, f);
                 p.sendMessage(" " + (i + 1) + ") " + ChatColor.AQUA + f
                         + ChatColor.GOLD + " : " + val);
             }
@@ -232,7 +264,13 @@ public class NpcGUIListener implements Listener {
                     p.sendMessage(ChatColor.RED + "먼저 항목을 선택하세요.");
                     return;
                 }
-                manager.setCurrentDataByCode(selCode);
+                if (!manager.setCurrentDataByCode(selCode)) {
+                    p.sendMessage(ChatColor.RED + "데이터 로드에 실패했습니다.");
+                    p.closeInventory();
+                    playerSelectedCode.remove(id);
+                    playerPage.remove(id);
+                    return;
+                }
 
                 if (dataMode == DataSelectorHolder.DataMode.CREATE) {
 
@@ -248,13 +286,27 @@ public class NpcGUIListener implements Listener {
 
                     p.sendMessage(ChatColor.GREEN + "NPC 생성, 이름 : " + d.name);
                     p.closeInventory();
+                    playerSelectedCode.remove(id);
+                    playerPage.remove(id);
                 } else {
                     // Fix 모드: Players/NPCs 선택 GUI 호출
                     p.closeInventory();
                     manager.openNpcEditGUI(p);
                 }
             }
-            case "✘ 취소" -> p.closeInventory();
+            case "✘ 취소" -> {
+                p.closeInventory();
+                fileSelector.clearSelectedForFix(id);
+                playerSelectedCode.remove(id);
+                playerPage.remove(id);
+                // ★ Create 모드라면 NPC도 제거
+                if (playerDataMode.get(id) == DataMode.CREATE) {
+                    Villager npc = playerNpcForCreate.remove(id);
+                    if (npc != null && !npc.isDead()) {
+                        npc.remove(); // 월드에서 엔티티 삭제
+                    }
+                }
+            }
 
             default -> {
                 // PromptData code 선택
@@ -271,15 +323,14 @@ public class NpcGUIListener implements Listener {
     }
 
     public void openPromptFixGUI(Player player) {
-        Inventory gui = Bukkit.createInventory(null, 9, "📋 수정할 데이터 타입 선택");
+        Inventory gui = Bukkit.createInventory(new DataFixHolder(null), 9, "📋 수정할 데이터 타입 선택");
 
         // ◼ Players
         ItemStack players = new ItemStack(Material.PLAYER_HEAD);
         ItemMeta pMeta = players.getItemMeta();
         pMeta.setDisplayName(ChatColor.GREEN + "Players");
         pMeta.setLore(Arrays.asList(
-                ChatColor.GRAY + "Code 기반 선택",
-                ChatColor.GRAY + "수정 가능: name, job, social_status, gender, background_code"
+                ChatColor.GRAY + "수정 가능 데이터 : name, job, social_status, gender, background_code"
         ));
         players.setItemMeta(pMeta);
         gui.setItem(3, players);
@@ -289,19 +340,25 @@ public class NpcGUIListener implements Listener {
         ItemMeta nMeta = npcs.getItemMeta();
         nMeta.setDisplayName(ChatColor.GREEN + "NPCs");
         nMeta.setLore(Arrays.asList(
-                ChatColor.GRAY + "Code 기반 선택",
-                ChatColor.GRAY + "수정 가능: name, era, job, social_status, gender,",
+                ChatColor.GRAY + "수정 가능 데이터 : name, era, job, social_status, gender,",
                 ChatColor.GRAY + "relation, city, description, background_code"
         ));
         npcs.setItemMeta(nMeta);
         gui.setItem(5, npcs);
+
+        // ◼ 취소 버튼 (9번째 슬롯)
+        ItemStack cancel = new ItemStack(Material.RED_WOOL);
+        ItemMeta cMeta = cancel.getItemMeta();
+        cMeta.setDisplayName(ChatColor.RED + "✘ 취소");
+        cancel.setItemMeta(cMeta);
+        gui.setItem(8, cancel);
 
         player.openInventory(gui);
     }
 
     @EventHandler
     public void onInventoryDrag(InventoryDragEvent e) {
-        if (e.getView().getTitle().startsWith("📋 NPC")) {
+        if (e.getInventory().getHolder() instanceof DataFixHolder) {
             e.setCancelled(true);
         }
     }
@@ -319,10 +376,15 @@ public class NpcGUIListener implements Listener {
         if (st.step == 0) {
             try {
                 int idx = Integer.parseInt(msg);
-                if (idx >= 1 && idx <= getEditableFields().length) {
-                    st.selectedField = getEditableFields()[idx - 1];
+                String[] fields = (st.data instanceof PlayerData)
+                        ? new String[]{"name","job","social_status","gender","background_code"}
+                        : getEditableFields();
+                if (idx >= 1 && idx <= fields.length) {
+                    st.selectedField = fields[idx - 1];
                     st.step = 1;
-                    String value = getFieldValue(st.data, st.selectedField);
+                    String value = (st.data instanceof PlayerData)
+                            ? getFieldValue((PlayerData)st.data, st.selectedField)
+                            : getFieldValue((PromptData)st.data, st.selectedField);
 
                     p.sendMessage(ChatColor.GREEN + "선택됨: " + st.selectedField + " → 현재 값: " + value);
                     p.sendMessage(ChatColor.YELLOW + "새 값을 입력하세요:");
@@ -333,10 +395,21 @@ public class NpcGUIListener implements Listener {
                 p.sendMessage(ChatColor.RED + "숫자를 입력해주세요.");
             }
         } else {
-            setFieldValue(st.data, st.selectedField, msg);
-            Bukkit.getScheduler().runTask(plugin, manager::saveNpcData);
-            p.sendMessage(ChatColor.GREEN + "✔ 수정 완료: " + st.selectedField + " → " + msg);
+            String oldValue;
+            if (st.data instanceof PlayerData) {
+                oldValue = getFieldValue((PlayerData)st.data, st.selectedField);
+                setFieldValue((PlayerData)st.data, st.selectedField, msg);
+                Bukkit.getScheduler().runTask(plugin, () -> manager.saveDataCategory(PromptEditorManager.DataCategory.PLAYERS));
+            } else {
+                oldValue = getFieldValue((PromptData)st.data, st.selectedField);
+                setFieldValue((PromptData)st.data, st.selectedField, msg);
+                Bukkit.getScheduler().runTask(plugin, () -> manager.saveDataCategory(PromptEditorManager.DataCategory.NPCS));
+            }
+            p.sendMessage(ChatColor.GREEN + "✔ 수정 완료: " + st.selectedField + " : " + ChatColor.GOLD + oldValue + ChatColor.WHITE + " → " + ChatColor.AQUA + msg);
             editing.remove(p.getUniqueId());
+            fileSelector.clearSelectedForFix(id);
+            playerSelectedCode.remove(id);
+            playerPage.remove(id);
         }
     }
 
@@ -371,6 +444,26 @@ public class NpcGUIListener implements Listener {
             case "relation" -> d.relation = value;
             case "city" -> d.city = value;
             case "description" -> d.description = value;
+            case "background_code" -> d.background_code = value;
+        }
+    }
+
+    private String getFieldValue(PlayerData d, String field) {
+        return switch (field) {
+            case "name" -> d.name;
+            case "job" -> d.job;
+            case "social_status" -> d.social_status;
+            case "gender" -> d.gender;
+            case "background_code" -> d.background_code;
+            default -> "";
+        };
+    }
+    private void setFieldValue(PlayerData d, String field, String value) {
+        switch (field) {
+            case "name" -> d.name = value;
+            case "job" -> d.job = value;
+            case "social_status" -> d.social_status = value;
+            case "gender" -> d.gender = value;
             case "background_code" -> d.background_code = value;
         }
     }

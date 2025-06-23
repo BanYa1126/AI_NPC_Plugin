@@ -250,7 +250,13 @@ public class NpcFileSelector implements Listener {
                 playerScroll.put(id, playerScroll.getOrDefault(id, 0) + FILES_PER_PAGE);
                 openGUI(p, playerNpc.get(id), mode);
             }
-            case "✘ 취소" -> p.closeInventory();
+            case "✘ 취소" -> {
+                p.closeInventory();
+                selectedForSet.remove(id);
+                selectedForFix.remove(id);
+                playerScroll.remove(id);
+                playerNpc.remove(id);
+            }
 
             case "✔ 적용", "✔ 선택" -> {
                 // 현재 선택한 파일 확인
@@ -270,9 +276,12 @@ public class NpcFileSelector implements Listener {
                 if (mode == Mode.PROMPT_SET) {
                     p.sendMessage(ChatColor.GREEN + "프롬프트 파일 적용 완료: " + sel);
                     p.closeInventory();
+                    selectedForSet.remove(id);
+                    playerScroll.remove(id);
+                    playerNpc.remove(id);
                 } else {
                     p.closeInventory();
-                    manager.openPromptFixGUI(p);
+                    manager.openNpcEditGUI(p);
                 }
             }
 
@@ -320,6 +329,11 @@ public class NpcFileSelector implements Listener {
         return lore;
     }
 
+    public void clearSelectedForFix(UUID id) {
+        selectedForFix.remove(id);
+        playerScroll.remove(id);
+        playerNpc.remove(id);
+    }
 
     // GUI 버튼 생성 헬퍼
     private ItemStack control(Material mat, String name) {

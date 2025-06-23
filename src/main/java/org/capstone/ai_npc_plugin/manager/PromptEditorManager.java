@@ -71,6 +71,7 @@ public class PromptEditorManager {
     private List<PlayerData> players;
     private List<BackgroundData> backgrounds;
     public enum DataCategory { PLAYERS, NPCS; }
+    private PlayerData currentPlayerData;
     // 생성자 - 폴더 경로 설정, GUI 리스너 초기화
     public PromptEditorManager(Plugin plugin, String folderPath) {
         this.plugin = plugin;
@@ -96,7 +97,7 @@ public class PromptEditorManager {
                 this, // PromptEditorManager 참조 전달
                 guiListener
         );
-
+        this.guiListener.setFileSelector(this.fileSelector);
         // NpcGUIListener 리스너 등록
         Bukkit.getPluginManager().registerEvents(guiListener, plugin);
     }
@@ -164,6 +165,10 @@ public class PromptEditorManager {
         return currentData;
     }
 
+    public PlayerData getCurrentPlayerData() {
+        return currentPlayerData;
+    }
+
     // 이름으로 프롬프트 데이터 로드 (플러그인 내부에서 /model reload 등에 사용)
     public boolean loadPromptDataByCode(String code) {
         File[] files = promptDataFolder.listFiles((dir, f) -> f.endsWith(".json"));
@@ -207,22 +212,36 @@ public class PromptEditorManager {
         return false;
     }
 
-    // 현재 NPC 데이터 저장
-    public void saveNpcData() {
+    public void saveDataCategory(PromptEditorManager.DataCategory category) {
         Gson gson = new GsonBuilder().setPrettyPrinting().create();
 
-        try (OutputStreamWriter w = new OutputStreamWriter(
-                new FileOutputStream(currentDataFile),
-                StandardCharsets.UTF_8
-        )) {
-            // 전체 데이터를 WorldPrompt 구조로 감싸기
-            WorldPrompt wrapper = new WorldPrompt();
-            wrapper.npcs = allData;
-
-            gson.toJson(wrapper, w);
-
+        // 1. 기존 파일 전체 읽기
+        JsonObject root;
+        try (InputStreamReader reader = new InputStreamReader(
+                new FileInputStream(currentDataFile), StandardCharsets.UTF_8)) {
+            root = JsonParser.parseReader(reader).getAsJsonObject();
         } catch (IOException ex) {
-            plugin.getLogger().severe("NPC 데이터 저장 실패: " + ex.getMessage());
+            plugin.getLogger().severe("JSON 읽기 실패: " + ex.getMessage());
+            return;
+        }
+
+        // 2. 변경된 데이터만 반영
+        if (category == PromptEditorManager.DataCategory.PLAYERS) {
+            // players만 갱신
+            JsonArray newPlayers = gson.toJsonTree(getPlayers()).getAsJsonArray();
+            root.add("players", newPlayers);
+        } else {
+            // npcs만 갱신
+            JsonArray newNpcs = gson.toJsonTree(getAllData()).getAsJsonArray();
+            root.add("npcs", newNpcs);
+        }
+
+        // 3. 전체 JSON을 다시 저장
+        try (OutputStreamWriter w = new OutputStreamWriter(
+                new FileOutputStream(currentDataFile), StandardCharsets.UTF_8)) {
+            gson.toJson(root, w);
+        } catch (IOException ex) {
+            plugin.getLogger().severe("데이터 저장 실패: " + ex.getMessage());
         }
     }
 
@@ -235,12 +254,13 @@ public class PromptEditorManager {
     // NPC 데이터 수정용 GUI 열기 (프롬프트 FIX 단계에서 호출)
     public void openNpcEditGUI(Player player) {
         // 1) 파일 선택 후 “✔ 변경” 시 호출 → Players/NPCs 고르는 두 번째 GUI 열기
-        guiListener.openFixSelector(player);
+        guiListener.openPromptFixGUI(player);
         // 이후 플레이어가 Players 혹은 NPCs 를 고르면 manager.openDataFixGUI() 가 실행됩니다.
     }
 
     //Players 또는 NPCs 데이터를 고른 뒤, 실제 수정할 항목 리스트를 GUI 로 띄웁니다.
     public void openDataFixGUI(Player player, DataCategory category) {
+
         File file = currentDataFile;  // loadPromptFile / setCurrentDataByCode 로 이미 세팅된 파일
         JsonObject root;
         try (InputStreamReader reader = new InputStreamReader(
@@ -315,6 +335,17 @@ public class PromptEditorManager {
         for (PromptData d : allData) {
             if (d.code != null && d.code.equals(code)) {
                 currentData = d;
+                return true;
+            }
+        }
+        return false;
+    }
+
+    public boolean setCurrentPlayerDataByCode(String code) {
+        if (players == null) return false;
+        for (PlayerData d : players) {
+            if (d.code != null && d.code.equals(code)) {
+                currentPlayerData = d; // 필요하다면 필드 추가
                 return true;
             }
         }
