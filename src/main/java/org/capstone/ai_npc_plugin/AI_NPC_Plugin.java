@@ -232,20 +232,24 @@ public final class AI_NPC_Plugin extends JavaPlugin {
             double distance = npc.getLocation().distance(target.getLocation());
 
             if (distance > 15) {
+                // 너무 멀면 순간이동
                 npc.teleport(target.getLocation().add(1, 0, 1));
             } else if (distance > 2.5) {
-                Location approach = target.getLocation().clone().add(target.getLocation().getDirection().normalize().multiply(-1));
-                npc.teleport(approach);
+                // 적과 적당히 멀면 걸어서 이동 (Paper API)
+                try {
+                    Location approach = target.getLocation().clone().add(target.getLocation().getDirection().normalize().multiply(-1));
+                    approach.setY(target.getLocation().getY()); // Y 유지
+                    npc.getPathfinder().moveTo(approach);
+                } catch (NoSuchMethodError | UnsupportedOperationException e) {
+                    // Paper API 미지원 시 fallback
+                    npc.teleport(target.getLocation().add(-1, 0, -1));
+                }
             } else {
-                // 공격 쿨타임 확인 (예: 2초)
+                // 공격 가능 거리
                 long last = lastAttackTime.getOrDefault(npcId, 0L);
                 if (now - last >= 2000) {
                     lastAttackTime.put(npcId, now);
-
-                    // 피해 적용
-                    target.damage(2.0, npc);
-
-                    // 사운드 효과 (근접 타격 느낌)
+                    target.damage(8.0, npc);
                     npc.getWorld().playSound(npc.getLocation(), "entity.player.attack.crit", 1.0f, 1.0f);
                     npc.getWorld().spawnParticle(org.bukkit.Particle.CRIT, target.getLocation(), 10);
                 }

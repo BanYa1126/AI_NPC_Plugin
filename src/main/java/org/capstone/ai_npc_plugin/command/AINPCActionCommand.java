@@ -2,15 +2,20 @@ package org.capstone.ai_npc_plugin.command;
 
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
+import org.bukkit.Location;
+import org.bukkit.NamespacedKey;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
+import org.bukkit.entity.Entity;
 import org.bukkit.entity.Player;
 import org.bukkit.entity.Villager;
+import org.bukkit.persistence.PersistentDataType;
 import org.capstone.ai_npc_plugin.AI_NPC_Plugin;
 import org.capstone.ai_npc_plugin.listener.NpcInteractListener;
 import org.capstone.ai_npc_plugin.npc.AINPC;
 
+import java.util.List;
 import java.util.UUID;
 
 /**
@@ -31,6 +36,22 @@ import java.util.UUID;
 public class AINPCActionCommand implements CommandExecutor {
 
     private final AI_NPC_Plugin plugin;
+
+    private Villager getTargetedVillager(Player player) {
+        List<Entity> nearby = player.getNearbyEntities(5, 5, 5); // 시야 근처 엔티티 탐색
+        for (Entity entity : nearby) {
+            if (entity instanceof Villager villager) {
+                // 마주보고 있는지 확인
+                if (player.hasLineOfSight(villager) && player.getLocation().distance(villager.getLocation()) < 5) {
+                    NamespacedKey key = new NamespacedKey(plugin, "ainpc");
+                    if (villager.getPersistentDataContainer().has(key, PersistentDataType.STRING)) {
+                        return villager;
+                    }
+                }
+            }
+        }
+        return null;
+    }
 
     // 생성자 → 메인 플러그인의 인스턴스를 받아 저장 (FollowMap, AssistMap 등 사용 목적)
     public AINPCActionCommand(AI_NPC_Plugin plugin) {
@@ -91,23 +112,33 @@ public class AINPCActionCommand implements CommandExecutor {
             // FOLLOW : 따라오기 명령
             // ========================
             case "follow" -> {
-                if (level == AINPC.AffinityLevel.HOSTILE || level == AINPC.AffinityLevel.NEUTRAL) {
-                    // HOSTILE or NEUTRAL → 무조건 거절
-                    player.sendMessage(ChatColor.RED + "[NPC] 당신을 따라가고 싶지 않아요.");
-                } else if (level == AINPC.AffinityLevel.FRIENDLY) {
-                    // FRIENDLY → 60% 확률적 수락
-                    boolean accepted = Math.random() < 0.6;
-                    if (accepted) {
-                        plugin.getFollowMap().put(playerId, npcId);
-                        player.sendMessage(ChatColor.GREEN + "[NPC] 알겠어요, 따라갈게요!");
-                    } else {
-                        player.sendMessage(ChatColor.YELLOW + "[NPC] 미안하지만 지금은 못 따라가겠어요.");
-                    }
-                } else if (level == AINPC.AffinityLevel.ALLY) {
-                    // ALLY → 무조건 수락
-                    plugin.getFollowMap().put(playerId, npcId);
-                    player.sendMessage(ChatColor.AQUA + "[NPC] 언제든지 따라가겠습니다!");
+                Villager target = getTargetedVillager(player);
+                if (target == null) {
+                    player.sendMessage(ChatColor.RED + "⚠️ 바라보는 NPC가 없습니다.");
+                    return true;
                 }
+
+                UUID playerUUID = player.getUniqueId();
+                UUID npcUUID = target.getUniqueId();
+
+                plugin.getFollowMap().put(playerUUID, npcUUID);
+                plugin.getWaitMap().remove(playerUUID); // 대기 해제
+                plugin.getAssistMap().remove(playerUUID); // 전투 지원 해제
+
+                // ✅ AI 다시 활성화 (wait 상태에서 비활성화 되었을 수 있음)
+                target.setAI(true);
+
+                // ✅ pathfinder 재지정 (즉시 따라오기 시작)
+                try {
+                    Location behindPlayer = player.getLocation().clone().add(player.getLocation().getDirection().normalize().multiply(-2));
+                    behindPlayer.setY(player.getLocation().getY());
+                    target.getPathfinder().moveTo(behindPlayer);
+                } catch (NoSuchMethodError | UnsupportedOperationException e) {
+                    // Spigot fallback (기본 텔레포트)
+                    target.teleport(player.getLocation().add(-1, 0, -1));
+                }
+
+                player.sendMessage(ChatColor.GREEN + "[NPC] 따라오기 시작!");
             }
 
             // ========================
@@ -119,8 +150,22 @@ public class AINPCActionCommand implements CommandExecutor {
                     player.sendMessage(ChatColor.RED + "⚠️ 바라보는 NPC가 없습니다.");
                     return true;
                 }
-                plugin.getWaitMap().put(player.getUniqueId(), target.getUniqueId());
-                plugin.getFollowMap().remove(player.getUniqueId()); // 따라오기 해제
+
+                UUID playerUUID = player.getUniqueId();
+                UUID npcUUID    = target.getUniqueId();
+
+                // 대기·추종·지원 맵 모두 최신 변수 사용
+                plugin.getWaitMap().put(playerUUID, npcUUID);
+                plugin.getFollowMap().remove(playerUUID);
+                plugin.getAssistMap().remove(playerUUID);
+                // 1) AI 비활성화
+                target.setAI(false);
+                // 2) 남은 pathfinder 취소
+                try {
+                    target.getPathfinder().stopPathfinding(); // Paper
+                } catch (NoSuchMethodError | UnsupportedOperationException ignored) {
+                    target.teleport(target.getLocation());    // Spigot 대체
+                }
                 player.sendMessage(ChatColor.YELLOW + "[NPC] 해당 위치에서 대기합니다.");
             }
 
