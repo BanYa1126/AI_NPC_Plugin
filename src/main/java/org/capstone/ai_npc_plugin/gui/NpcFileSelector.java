@@ -90,7 +90,6 @@ public class NpcFileSelector implements Listener {
     // mode 에 따라 제목과 적용 버튼 텍스트가 달라짐
     public void openGUI(Player player, Villager npc, Mode mode) {
         UUID id = player.getUniqueId();
-        playerScroll.remove(id); // 페이지 인덱스 초기화
         playerNpc.put(id, npc); // 연결된 NPC 저장
 
         // Holder 설정 (구분용)

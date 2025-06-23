@@ -60,7 +60,7 @@ processResources {
 
 tasks.jar{
     archiveFileName = 'AI_NPC_Plugin.jar'
-    destinationDirectory = file('D://PJ//Minecraft_Server//plugins')
+    destinationDirectory = file('C://Users//PC//Desktop//Minecraft_Server//plugins')
 }
 
 dependencies {
