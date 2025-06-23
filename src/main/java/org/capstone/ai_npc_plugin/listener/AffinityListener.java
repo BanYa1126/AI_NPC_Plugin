@@ -18,17 +18,13 @@ import java.util.UUID;
 
 /**
  * AffinityListener
- *
  * NPC 우호도(Affinity)를 조작하는 이벤트 처리 클래스
- *
  * 주요 기능:
  * - Shift 우클릭 + 에메랄드 → 우호도 상승
  * - 플레이어가 NPC 공격 시 → 우호도 감소
- *
  * 이벤트 처리:
  * - PlayerInteractEntityEvent : 에메랄드 주기
  * - EntityDamageByEntityEvent : 공격 시 우호도 감소
- *
  * NPCStateManager 를 통해 affinityMap 을 업데이트
  */
 
@@ -68,12 +64,9 @@ public class AffinityListener implements Listener {
 
         // 현재 우호도 조회
         UUID npcId = villager.getUniqueId();
-        int currentAffinity = ((AI_NPC_Plugin) plugin).getNpcStateManager().getAffinity(npcId);
-
         // 우호도 +10 상승
-        int newAffinity = currentAffinity + 10;
-        ((AI_NPC_Plugin) plugin).getNpcStateManager().setAffinity(npcId, newAffinity);
-
+        ((AI_NPC_Plugin) plugin).getNpcStateManager().addAffinity(npcId, 10);
+        int newAffinity = ((AI_NPC_Plugin) plugin).getNpcStateManager().getAffinity(npcId);
         // 플레이어에게 알림
         player.sendMessage(ChatColor.GREEN + "[NPC] 우호도가 상승했습니다! 현재 점수: " + newAffinity);
     }
@@ -84,22 +77,17 @@ public class AffinityListener implements Listener {
 
         // 피해 대상이 Villager인지 확인
         if (!(event.getEntity() instanceof Villager villager)) return;
-
         // 공격자가 Player인지 확인
         if (!(event.getDamager() instanceof Player player)) return;
-
         // AI NPC 여부 확인
         NamespacedKey key = new NamespacedKey(plugin, "ainpc");
         if (!villager.getPersistentDataContainer().has(key, PersistentDataType.STRING)) return;
 
         // 현재 우호도 조회
         UUID npcId = villager.getUniqueId();
-        int currentAffinity = ((AI_NPC_Plugin) plugin).getNpcStateManager().getAffinity(npcId);
-
         // 우호도 -15 감소
-        int newAffinity = currentAffinity - 15;
-        ((AI_NPC_Plugin) plugin).getNpcStateManager().setAffinity(npcId, newAffinity);
-
+        ((AI_NPC_Plugin) plugin).getNpcStateManager().addAffinity(npcId, -15);
+        int newAffinity = ((AI_NPC_Plugin) plugin).getNpcStateManager().getAffinity(npcId);
         // 플레이어에게 알림
         player.sendMessage(ChatColor.RED + "[NPC] 우호도가 감소했습니다! 현재 점수: " + newAffinity);
     }

@@ -59,6 +59,11 @@ public class NPCStateManager {
     public int getAffinity(UUID npcId) {
         return affinityMap.getOrDefault(npcId, 50); // 기본 50
     }
+
+    public void addAffinity(UUID npcId, int delta) {
+        int cur = affinityMap.getOrDefault(npcId, 50);
+        setAffinity(npcId, cur + delta);   // setAffinity 안에서 0~100 클램프
+    }
     /**
      * 우호도 상태 저장 (npc_states.json)
      * - JSON 직렬화
