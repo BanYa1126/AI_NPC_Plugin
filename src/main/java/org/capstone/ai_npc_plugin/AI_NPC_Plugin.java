@@ -54,6 +54,8 @@ public final class AI_NPC_Plugin extends JavaPlugin {
     // 플레이어 → 따라오는 NPC (follow 명령어)
     private final Map<UUID, UUID> followMap = new HashMap<>();
 
+    private final Map<UUID, UUID> waitMap = new HashMap<>();
+
     // 플레이어 → 전투 지원 NPC (assist 명령어)
     private final Map<UUID, UUID> assistMap = new HashMap<>();
 
@@ -70,6 +72,7 @@ public final class AI_NPC_Plugin extends JavaPlugin {
     public Map<UUID, UUID> getFollowMap() { return followMap; }
     public Map<UUID, UUID> getAssistMap() { return assistMap; }
     public Map<UUID, UUID> getNpcTargetMap() { return npcTargetMap; }
+    public Map<UUID, UUID> getWaitMap() { return waitMap; }
     public PromptEditorManager getNpcManager() { return promptEditorManager; }
     public NPCStateManager getNpcStateManager() { return npcStateManager; }
     public PersistentModelClient getPersistentModelClient() { return persistentModelClient; }
@@ -162,6 +165,13 @@ public final class AI_NPC_Plugin extends JavaPlugin {
      * 플레이어 → NPC 따라가기 처리
      */
     private void runFollowTask() {
+        // 대기 상태 해제: NPC가 사라졌거나 죽었으면 waitMap에서 제거
+        getWaitMap().entrySet().removeIf(entry -> {
+            UUID npcId = entry.getValue();
+            Villager npc = (Villager) Bukkit.getEntity(npcId);
+            return (npc == null || npc.isDead());
+        });
+
         for (Map.Entry<UUID, UUID> entry : followMap.entrySet()) {
             Player player = Bukkit.getPlayer(entry.getKey());
             if (player == null || !player.isOnline()) continue;
@@ -169,6 +179,9 @@ public final class AI_NPC_Plugin extends JavaPlugin {
             UUID npcId = entry.getValue();
             Villager npc = (Villager) Bukkit.getEntity(npcId);
             if (npc == null || npc.isDead()) continue;
+
+            // 대기 중인 NPC는 이동시키지 않음
+            if (getWaitMap().containsKey(player.getUniqueId())) continue;
 
             npc.setAI(true); // AI 활성화
 
@@ -182,13 +195,12 @@ public final class AI_NPC_Plugin extends JavaPlugin {
             } else if (distance > 2.5) {
                 // 2.5~15m: 이동 경로 설정
                 Location behindPlayer = playerLoc.clone().add(playerLoc.getDirection().normalize().multiply(-2));
-                behindPlayer.setY(playerLoc.getY()); // Y 값 유지
-                npc.getPathfinder().moveTo(behindPlayer); // 걸어서 이동 (Paper API 기준)
+                behindPlayer.setY(playerLoc.getY()); // 높이 유지
+                npc.getPathfinder().moveTo(behindPlayer); // Paper API 기반 이동
             }
-            // 2.5 이하: 정지 (아무 동작 없음)
+            // 2.5 이하: 정지 (이동 명령 없음)
         }
     }
-
     /**
      * 주기적 전투 AI Task
      * NPC → 타겟 공격 동작

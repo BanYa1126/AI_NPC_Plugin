@@ -114,11 +114,16 @@ public class AINPCActionCommand implements CommandExecutor {
             // WAIT : 대기 명령
             // ========================
             case "wait" -> {
-                // 따라가기, 전투 지원 모두 해제 → 대기 상태로 변경
-                plugin.getFollowMap().remove(playerId);
-                plugin.getAssistMap().remove(playerId);
-                player.sendMessage(ChatColor.YELLOW + "[NPC] 여기서 대기하겠습니다.");
+                Villager target = getTargetedVillager(player); // 대상 NPC
+                if (target == null) {
+                    player.sendMessage(ChatColor.RED + "⚠️ 바라보는 NPC가 없습니다.");
+                    return true;
+                }
+                plugin.getWaitMap().put(player.getUniqueId(), target.getUniqueId());
+                plugin.getFollowMap().remove(player.getUniqueId()); // 따라오기 해제
+                player.sendMessage(ChatColor.YELLOW + "[NPC] 해당 위치에서 대기합니다.");
             }
+
 
             // ========================
             // ASSIST : 전투 지원 모드
