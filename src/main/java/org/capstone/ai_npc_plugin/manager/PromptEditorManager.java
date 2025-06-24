@@ -243,6 +243,9 @@ public class PromptEditorManager {
         } catch (IOException ex) {
             plugin.getLogger().severe("데이터 저장 실패: " + ex.getMessage());
         }
+        if (currentDataFile != null && currentDataFile.equals(this.currentDataFile)) {
+            sendReloadPromptToModel();
+        }
     }
 
     // 프롬프트 수정용 GUI 열기
