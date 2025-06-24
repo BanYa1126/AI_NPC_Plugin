@@ -72,6 +72,7 @@ public class CombatAssistListener implements Listener {
 
         // 플레이어가 공격한 대상 (타겟)
         Entity target = event.getEntity();
+        if (target.getUniqueId().equals(npcId)) return;
         if (!(target instanceof LivingEntity)) return;
 
         // 타겟 등록 (NPC → 타겟 UUID)
