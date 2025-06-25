@@ -1,81 +1,71 @@
-✅ 프로젝트 개요
-프로젝트명: 생성형 AI 기반 단일 NPC 플러그인
-목표: 단 하나의 AI NPC가 플레이어와 1:1로 상호작용하며, 프롬프트 기반 대화를 실시간으로 생성하고 출력
-사용 기술:
-- Java (IntelliJ, Paper 기반 Minecraft 플러그인)
-- Python (모델 서버, TCP 소켓 통신)
-- GSON (JSON 처리)
+# AI_NPC_Plugin
+Minecraft에서 생성형 AI 모델을 기반으로 한 대화형 NPC를 생성하고 관리할 수 있는 플러그인입니다.  
+플레이어와 NPC 간의 실시간 상호작용을 통해 몰입감 있는 게임 경험을 제공합니다.  
+본 플러그인은 2025년 동의대학교 컴퓨터공학과 캡스톤디자인 과제로 개발되었습니다.
 
-✅ 전체 아키텍처
-[웹] → 프롬프트 JSON 작성
-    ↓ 수동 저장
-[모델 서버 (Python)] ←→ (TCP 소켓, JSON) ←→ [마인크래프트 플러그인 (Java)]
-                               ↕
-                     플레이어 채팅 & AI 응답 출력
+## 주요 기능
+- 생성형 AI 기반 NPC 프롬프트 자동 생성 및 커스터마이징
+- NPC 생성, 수정, 삭제, 대화모드 등 다양한 제어 명령어 제공
+- 모델 서버와의 **지속적 TCP 소켓 통신**을 통한 빠른 대화 응답
+- GUI 기반 프롬프트/배경 설정 기능
+- 플레이어와 NPC 간의 우클릭 및 거리 기반 상호작용
+- JSON 기반 프롬프트 데이터 관리 및 NPC 상태 저장
+- 모델 서버 실행/중단/상태 확인 등의 명령어 제공
 
-✅ 주요 구성 요소
-모듈	              기능
-웹	              프롬프트 JSON (npc.json) 생성 후 서버 디렉토리에 수동 저장
-모델 서버 (Python)  npc.json 기반으로 응답 생성, TCP 통해 플러그인과 통신
-플러그인 (Java)	  모델 실행/중단/리로드, 채팅 감지, 응답 출력, GUI 편집 등 담당
+- ## 프로젝트 구조
+- AI_NPC_Plugin/
+├── src/
+│ └── main/
+│ └── java/
+│ └── org.capstone.ai_npc_plugin/
+│ ├── command/ # 명령어 처리 클래스
+│ ├── controller/ # 모델 제어 및 실행 컨트롤러
+│ ├── gui/ # 프롬프트 GUI 관련 클래스
+│ ├── listener/ # 이벤트 리스너 (채팅, 클릭 등)
+│ ├── manager/ # 상태 및 프롬프트 관리
+│ ├── network/ # 모델 서버와의 TCP 통신 처리
+│ └── npc/ # NPC, 프롬프트, 월드 프롬프트 구조체
+├── resources/
+│ ├── plugin.yml # 플러그인 설정 파일
+│ └── config.yml # 커스텀 설정 파일
 
-✅ 명령어 체계
-명령어	                        기능
-/model on / off / status	    모델 서버 프로세스 실행 및 상태 확인
-/model reload	                저장된 프롬프트 JSON을 불러와 NPC 상태 갱신
-/ainpc create	                (예정) 프롬프트 선택 GUI 실행 + NPC 초기화
-/ainpc prompt_fix	            프롬프트 GUI 열기 → 수정 → JSON 저장
-/ainpc remove / reset / chatlog	단일 NPC 상태 초기화 또는 로그 확인
+## 생성형 AI 연동 구조
+플레이어 입력 → 플러그인 내부 처리
+→ PromptData 선택 → WorldPrompt 구조로 직렬화
+→ TCP 소켓 통신으로 모델 서버 전달
+→ 생성된 응답 수신 → NPC가 채팅 형식으로 응답 출력
+- 모델 서버는 Python 기반이며, 파인튜닝된 Polyglot-Ko 기반 모델을 사용합니다.
+- 응답 형식: JSON 문자열 (액션: `chat`, `prompt_load`, 등)
 
-✅ 주요 클래스 구조
-org.capstone.ai_npc_plugin/
-├── AI_NPC_Plugin.java               // 메인 플러그인 클래스
-├── command/
-│   ├── ModelCommand.java           // /model 명령어 처리
-│   └── AINPCCommand.java           // /ainpc 명령어 처리
-├── controller/
-│   └── ModelController.java        // 모델 프로세스 관리
-├── gui/
-│   ├── PromptEditorManager.java    // 프롬프트 GUI 제어 (구 NpcManager)
-│   └── NpcGUIListener.java         // GUI 이벤트 처리 (구 NpcGUIListener)
-├── npc/
-│   ├── AINPC.java                  // 단일 NPC 상태 (이름, 프롬프트, 로그)
-│   └── PromptData.java             // 프롬프트 JSON 데이터 (구 NpcPromptData)
-├── listener/
-│   └── ChatListener.java           // 플레이어 채팅 감지 및 모델 전송
-├── network/
-│   └── ModelSocketClient.java      // 모델 서버와 TCP 소켓 통신
+## 명령어
+|          명령어          |          설명           |
+|--------------------------|--------------------------|
+| `/ainpc create`          | 새 NPC 생성 (GUI 포함)   |
+| `/ainpc prompt_set`      | 프롬프트 설정 GUI 호출   |
+| `/ainpc prompt_fix`      | 기존 NPC의 프롬프트 수정 |
+| `/ainpc chatmode on/off` | 대화모드 활성/비활성     |
+| `/ainpc disengage`       | 현재 NPC와의 대화 종료   |
 
-✅ 주요 흐름 정리
-/ainpc prompt_fix
-1. GUI 열림 → 필드 수정
-2. 수정 결과 → PromptData 객체에 반영
-3. npc.json으로 저장됨
-4. 사용자에게 /model reload 안내 출력
+## 데이터 구조 예시
+json
+{
+  "npcs": [
+    {
+      "code": "N010",
+      "name": "바르가",
+      "job": "병사",
+      "gender": "남성",
+      "background_code": "B000",
+      ...
+    }
+],
+  "backgrounds": [...],
+  "players": [...]
+}
 
-/model reload
-1. npc.json 로드
-2. PromptData 기반으로 AINPC 상태 갱신
-3. 이후 채팅 입력 시 새로운 프롬프트 기반으로 모델 대화 진행
-
-✅ 통신 흐름
-1. 웹에서 prompts.json 생성
-2. 사용자가 직접 모델 폴더에 해당 JSON 파일 저장
-3. /model on 명령어로 모델 실행 (ProcessBuilder)
-4. 모델은 localhost:12345에서 TCP 대기
-5. 플레이어 채팅 발생 시 → ChatListener 감지
-6. ModelSocketClient에서 채팅 JSON 전송 → 응답 JSON 수신
-7. 플러그인이 응답을 게임 내 채팅으로 출력
-8. 필요 시 /model off로 종료
-
-✅ 테스트 완료 상태
-- 모델 명령어 정상 작동 (on, off, status)
-- 단일 AI NPC 상태 및 설정 조작 가능
-- 채팅 감지 및 모델 연결 테스트 완료
-- JSON 요청 및 응답 포맷 설계 완료
-- 게임 내 응답 출력 확인 완료
-- /model reload → JSON 기반 반영 구조 확정
-
-✅ 향후 진행 사항
-🔲 Prompt 선택 GUI (PromptSelectGUI)	/ainpc create 후 여러 프롬프트 JSON 중 선택
-🔲 NPC 시각화 연동   NPC 실체화 작업, 우선 기본 마크 주민을 사용
+기술 스택
+Minecraft API: Spigot 1.20
+Java: 주요 플러그인 로직
+Python: 모델 서버 및 프롬프트 생성기
+TCP Socket: 실시간 통신 구현
+JSON: 프롬프트 데이터 직렬화/역직렬화
