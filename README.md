@@ -14,7 +14,6 @@ Minecraft에서 생성형 AI 모델을 기반으로 한 대화형 NPC를 생성�
 
 - ## 프로젝트 구조
 ![image](https://github.com/user-attachments/assets/14d22013-7082-409e-8077-0bacb58c389d)
-![image](https://github.com/user-attachments/assets/14d22013-7082-409e-8077-0bacb58c389d)
 
 ## 생성형 AI 연동 구조
 플레이어 입력 → 플러그인 내부 처리
