@@ -41,7 +41,6 @@ public class ChatListener implements Listener {
             return;
         }
 
-        event.setCancelled(true);
         String msg = event.getMessage();
 
         Bukkit.getScheduler().runTask(plugin, () -> {
